@@ -45,6 +45,16 @@
             "maxLength": 120
           }
         },
+        "locations": {
+          "type": "array",
+          "maxItems": 30,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          }
+        },
         "people": {
           "type": "array",
           "maxItems": 50,
@@ -126,4 +136,3 @@
     }
   }
 }
-

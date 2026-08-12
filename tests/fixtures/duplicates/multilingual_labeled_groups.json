@@ -1,0 +1,78 @@
+{
+  "schema_version": "1.0",
+  "description": "Same-language labeled near-duplicate groups for acceptance scoring.",
+  "languages": {
+    "en": [
+      {
+        "label": "en-election",
+        "title": "Election commission publishes final parliamentary results",
+        "content": "The election commission published the final parliamentary results after all districts completed counting."
+      },
+      {
+        "label": "en-storm",
+        "title": "Coastal storm closes ports and cancels ferry services",
+        "content": "A severe coastal storm closed ports and cancelled ferry services while emergency crews warned residents."
+      },
+      {
+        "label": "en-rates",
+        "title": "Central bank keeps benchmark interest rate unchanged",
+        "content": "The central bank kept its benchmark interest rate unchanged and repeated its inflation outlook."
+      },
+      {
+        "label": "en-volcano",
+        "title": "Volcano eruption forces evacuation of nearby villages",
+        "content": "A volcano eruption forced officials to evacuate nearby villages as ash disrupted regional flights."
+      }
+    ],
+    "es": [
+      {
+        "label": "es-election",
+        "title": "La comisión electoral publica los resultados parlamentarios finales",
+        "content": "La comisión electoral publicó los resultados parlamentarios finales después del recuento de todos los distritos."
+      },
+      {
+        "label": "es-storm",
+        "title": "Una tormenta costera cierra puertos y cancela ferris",
+        "content": "Una fuerte tormenta costera cerró puertos y canceló ferris mientras emergencias alertaba a los residentes."
+      },
+      {
+        "label": "es-rates",
+        "title": "El banco central mantiene sin cambios el tipo de interés",
+        "content": "El banco central mantuvo sin cambios el tipo de interés de referencia y reiteró su previsión de inflación."
+      },
+      {
+        "label": "es-volcano",
+        "title": "La erupción de un volcán obliga a evacuar pueblos cercanos",
+        "content": "La erupción de un volcán obligó a evacuar pueblos cercanos mientras la ceniza afectaba a los vuelos."
+      }
+    ],
+    "ru": [
+      {
+        "label": "ru-election",
+        "title": "Избирательная комиссия опубликовала окончательные итоги выборов",
+        "content": "Избирательная комиссия опубликовала окончательные итоги парламентских выборов после подсчета во всех округах."
+      },
+      {
+        "label": "ru-storm",
+        "title": "Прибрежный шторм закрыл порты и отменил паромы",
+        "content": "Сильный прибрежный шторм закрыл порты и отменил паромы, спасатели предупредили жителей."
+      },
+      {
+        "label": "ru-rates",
+        "title": "Центральный банк сохранил ключевую ставку без изменений",
+        "content": "Центральный банк сохранил ключевую ставку без изменений и подтвердил прогноз по инфляции."
+      },
+      {
+        "label": "ru-volcano",
+        "title": "Извержение вулкана вынудило эвакуировать близлежащие поселки",
+        "content": "Извержение вулкана вынудило власти эвакуировать близлежащие поселки, пепел нарушил авиасообщение."
+      }
+    ]
+  },
+  "variants": [
+    {"title_suffix": "", "content_suffix": ""},
+    {"title_suffix": " — latest report", "content_suffix": " Source report one."},
+    {"title_suffix": " (update)", "content_suffix": " Source report two."},
+    {"title_suffix": " | live updates", "content_suffix": " Source report three."}
+  ]
+}

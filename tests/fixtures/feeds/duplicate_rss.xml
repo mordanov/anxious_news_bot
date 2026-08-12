@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Duplicate Fixture</title>
+    <link>https://duplicate.example/</link>
+    <description>Repeated canonical article fixture</description>
+    <item>
+      <guid isPermaLink="false">duplicate-001</guid>
+      <title>City opens a new public library</title>
+      <link>https://news.example/library?utm_medium=rss&amp;utm_source=duplicate</link>
+      <description>A new library opened in the city center.</description>
+      <pubDate>Wed, 12 Aug 2026 12:05:00 GMT</pubDate>
+    </item>
+  </channel>
+</rss>

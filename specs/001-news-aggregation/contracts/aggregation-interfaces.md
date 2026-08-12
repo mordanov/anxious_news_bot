@@ -52,9 +52,15 @@ cycle. Existing exact duplicates are not returned as new.
 - MUST include scores, thresholds, algorithm version, and bounded evidence.
 - MUST NOT decide personal relevance.
 
-`group_event(article, candidates, validated_analysis) -> EventGroupingResult`
+`group_event(article, candidates) -> EventGroupingResult`
 
 - MUST remain separate from textual duplicate classification.
+- MUST consider only distinct-source, same-language candidates in the configured
+  time window, falling back from publication time to ingestion time.
+- MUST calculate the configured weighted title, content, topic-overlap, and
+  geographic-overlap score and enforce the configured anchor condition.
+- MUST distinguish automatic assignment, review proposal, and distinct outcomes.
+- MUST NOT require enrichment or an external semantic provider.
 - MUST retain evidence for group assignment or reassignment.
 
 ## ArticleEnricher
@@ -104,6 +110,33 @@ uniqueness and source-record idempotency MUST be database-enforced.
 The coordinator MUST NOT import Telegram handlers, Personal Ranking, user
 preferences, or a concrete LLM provider.
 
+## AggregationScheduler
+
+`start()` registers one repeating application job at the configured scan interval;
+`stop()` removes it during graceful shutdown.
+
+- Each tick MUST invoke only `NewsAggregator.run_cycle()`.
+- The scheduler MUST NOT contain fetching, normalization, persistence, enrichment,
+  or Telegram message-handler logic.
+- An `already_running` result is a normal observable outcome and MUST NOT be retried
+  inside the same tick.
+- Due-source selection remains the repository/coordinator's responsibility.
+
+## SourceCatalogService
+
+`validate(catalog) -> CatalogValidationResult` validates the complete document
+against [source-catalog.schema.json](source-catalog.schema.json), supported adapter
+types, duplicate identifiers, endpoint conflicts, and domain constraints without
+writing.
+
+`apply(catalog) -> CatalogApplyResult` repeats validation and atomically upserts all
+listed sources by stable identifier. Omitted sources remain unchanged. The result
+contains sanitized added, updated, and unchanged identifiers.
+
+The CLI exposes `anxious-news-sources validate FILE` and
+`anxious-news-sources apply FILE`. Validation or persistence failure returns a
+non-zero status; apply MUST commit all entries or none.
+
 ## Error taxonomy
 
 - `SourceUnavailable`: connection, timeout, or exhausted transient response.
@@ -116,4 +149,3 @@ preferences, or a concrete LLM provider.
 
 Errors exposed in logs or persisted diagnostics contain classification and bounded
 context only; secrets and unnecessary raw content are excluded.
-

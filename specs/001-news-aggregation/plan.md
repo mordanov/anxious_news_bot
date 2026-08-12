@@ -8,17 +8,17 @@
 Add a News Aggregator and Article Analysis module to the existing Python modular
 monolith. The pipeline fetches enabled RSS/Atom sources concurrently, normalizes
 and validates records, persists canonical articles in PostgreSQL, detects exact and
-near duplicates, optionally enriches articles through a strictly validated
-boundary, and returns the articles created by the cycle. Each pipeline capability
-is replaceable and source failures are isolated. PostgreSQL uniqueness and
-idempotent writes make retries deterministic; no user preferences or personal
-ranking enter this module.
+near duplicates, groups same-event reports with a deterministic weighted evidence
+policy, optionally enriches articles through a strictly validated boundary, and
+returns the articles created by the cycle. Each pipeline capability is replaceable
+and source failures are isolated. PostgreSQL uniqueness and idempotent writes make
+retries deterministic; no user preferences or personal ranking enter this module.
 
 ## Technical Context
 
 **Language/Version**: Python 3.11  
-**Primary Dependencies**: python-telegram-bot 21.6+, SQLAlchemy 2.x, Alembic 1.x,
-Psycopg 3, HTTPX 0.27+, feedparser 6.x, Pydantic 2.x, Tenacity 8+  
+**Primary Dependencies**: python-telegram-bot 21.6+ with JobQueue, SQLAlchemy 2.x,
+Alembic 1.x, Psycopg 3, HTTPX 0.27+, feedparser 6.x, Pydantic 2.x, Tenacity 8+
 **Storage**: PostgreSQL 16+ with `pg_trgm`; Alembic-managed schema  
 **Testing**: pytest, pytest-asyncio, HTTPX MockTransport, fake enrichers, and
 integration tests against ephemeral PostgreSQL  
@@ -30,7 +30,9 @@ articles within 10 minutes of the final source response; exact canonical lookups
 remain index-backed; bounded source concurrency prevents resource exhaustion  
 **Constraints**: One source failure cannot cancel sibling sources; repeated input
 must be idempotent; no direct LLM persistence; no live network or LLM in unit tests;
-no user-specific data in aggregation; secrets and raw payloads excluded from logs  
+same-event grouping must work without enrichment and record its configuration; no
+overlapping cycles; source-catalog imports are atomic; no user-specific data in
+aggregation; secrets and raw payloads excluded from logs
 **Scale/Scope**: Initial single-instance deployment, tens of configured sources,
 up to roughly 10,000 ingested source records per day, World/Russia/Spain coverage,
 RSS/Atom first with replaceable adapters for later source types
@@ -48,11 +50,11 @@ RSS/Atom first with replaceable adapters for later source types
   Pydantic output. Deterministic mapping persists only validated sections; invalid
   output is retained as a sanitized failure outcome, not article metadata.
 - **Determinism and explainability — PASS**: URL policy, normalization versions,
-  database uniqueness, deduplication thresholds, comparison evidence, and cycle
-  outcomes make decisions repeatable and auditable.
+  database uniqueness, duplicate and event-group thresholds, comparison evidence,
+  and cycle outcomes make decisions repeatable and auditable.
 - **Data and configuration — PASS**: PostgreSQL is authoritative, all schema
   changes use Alembic, and polling, timeouts, concurrency, URL policy, retry limits,
-  and duplicate thresholds are configuration.
+  scheduler cadence, and duplicate/event thresholds are configuration.
 - **Reliability and tests — PASS**: Ports allow network, clock, enrichment, and
   persistence test doubles. Source transactions are isolated and PostgreSQL
   integration tests cover uniqueness, upserts, migrations, and `pg_trgm`.
@@ -71,7 +73,8 @@ specs/001-news-aggregation/
 ├── quickstart.md
 ├── contracts/
 │   ├── aggregation-interfaces.md
-│   └── enrichment-result.schema.json
+│   ├── enrichment-result.schema.json
+│   └── source-catalog.schema.json
 └── tasks.md
 ```
 
@@ -88,16 +91,19 @@ src/anxious_news_bot/
 ├── config.py
 ├── logging.py
 └── news/
+    ├── cli.py
     ├── domain.py
     ├── ports.py
     ├── schemas.py
     ├── services/
     │   ├── aggregate.py
     │   ├── canonicalize.py
-    │   └── deduplicate.py
+    │   ├── deduplicate.py
+    │   └── source_catalog.py
     └── infrastructure/
         ├── feeds.py
         ├── persistence.py
+        ├── scheduling.py
         └── models.py
 
 tests/
@@ -123,6 +129,8 @@ Research decisions and rejected alternatives are recorded in
   defined in [data-model.md](data-model.md).
 - Replaceable application boundaries are defined in
   [contracts/aggregation-interfaces.md](contracts/aggregation-interfaces.md).
+- Transactional operator source management is defined by
+  [contracts/source-catalog.schema.json](contracts/source-catalog.schema.json).
 - Strict enrichment output is defined in
   [contracts/enrichment-result.schema.json](contracts/enrichment-result.schema.json).
 - The implementation and acceptance workflow is defined in
@@ -132,4 +140,3 @@ Research decisions and rejected alternatives are recorded in
 ## Complexity Tracking
 
 No constitution violations require justification.
-

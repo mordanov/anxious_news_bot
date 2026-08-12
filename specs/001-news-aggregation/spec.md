@@ -16,9 +16,10 @@ depending on each source's format.
 **Why this priority**: A reliable normalized pool is the minimum useful output and
 the foundation for analysis, ranking, and digest delivery.
 
-**Independent Test**: Configure multiple sources with one unavailable source, run
-one collection cycle, and confirm valid articles from the available sources are
-stored and returned in the normalized format.
+**Independent Test**: Configure multiple sources with one unavailable source,
+start scheduled collection, and confirm that due sources run repeatedly at their
+configured cadence, valid articles from available sources are stored and returned,
+and overlapping scheduler ticks do not create a second active cycle.
 
 **Acceptance Scenarios**:
 
@@ -31,6 +32,12 @@ stored and returned in the normalized format.
 3. **Given** a source record missing a required article field, **When** it is
    processed, **Then** that record is rejected without stopping other records or
    sources.
+4. **Given** a collection cycle is already running, **When** another scheduled tick
+   occurs, **Then** the tick records an already-running outcome and does not start
+   an overlapping cycle.
+5. **Given** enabled sources with different polling intervals, **When** the
+   scheduler ticks, **Then** only sources due at that time are processed and each
+   due source is attempted within one scheduler interval.
 
 ---
 
@@ -45,7 +52,8 @@ downstream digests from being dominated by repeated coverage.
 **Independent Test**: Submit articles containing an identical canonical URL,
 near-identical text, and distinct-source reports of the same event; confirm exact
 duplicates are stored once and event-related stories are grouped while their
-source links remain available.
+source links remain available. Event grouping uses the same deterministic policy
+and configuration for every run and does not require enrichment.
 
 **Acceptance Scenarios**:
 
@@ -55,8 +63,12 @@ source links remain available.
    processed, **Then** they are recognized as duplicate coverage according to the
    configured threshold.
 3. **Given** distinct source reports about the same underlying event, **When** they
-   are processed, **Then** they share an event group and retain their individual
-   source URLs.
+   are within the configured 48-hour candidate window and meet the configured
+   evidence threshold, **Then** they share an event group and retain their
+   individual source URLs.
+4. **Given** an event candidate whose evidence falls in the configured review band,
+   **When** it is processed, **Then** it remains a separate article with a
+   reviewable proposed-group decision rather than being merged automatically.
 
 ---
 
@@ -94,9 +106,10 @@ changing aggregation rules so that coverage can evolve operationally.
 **Why this priority**: Extensibility supports growth after the core pipeline is
 reliable.
 
-**Independent Test**: Add a source for a new region using supported source
-capabilities, run collection, and confirm it enters the common pool without
-changing article definitions or aggregation rules.
+**Independent Test**: Validate and transactionally import a source-catalog file
+that adds a supported source in a new region, updates an existing source, and
+disables another; run collection and confirm only enabled due sources enter the
+common pool without changing article definitions or aggregation rules.
 
 **Acceptance Scenarios**:
 
@@ -104,6 +117,15 @@ changing article definitions or aggregation rules.
    enabled, **Then** its valid articles enter the normalized pool.
 2. **Given** a disabled source, **When** a collection cycle runs, **Then** the
    source is not contacted or processed.
+3. **Given** a valid versioned source-catalog file, **When** an operator performs a
+   dry run, **Then** all proposed additions and updates are reported without
+   changing stored sources.
+4. **Given** a valid versioned source-catalog file, **When** an operator applies it,
+   **Then** all listed sources are added or updated in one transaction while
+   omitted sources remain unchanged.
+5. **Given** any invalid or duplicate source entry, **When** an operator validates
+   or applies the catalog, **Then** the command reports actionable validation
+   errors and no source changes are committed.
 
 ### Edge Cases
 
@@ -147,7 +169,15 @@ changing article definitions or aggregation rules.
 - **FR-010**: The system MUST identify near-duplicate title or content according to
   configurable comparison thresholds.
 - **FR-011**: The system MUST support grouping distinct-source articles that
-  represent the same underlying event while retaining every source URL.
+  represent the same underlying event while retaining every source URL. The
+  initial policy MUST be deterministic and provider-independent: compare only
+  same-language reports within a configurable 48-hour publication-time window;
+  calculate `0.50 × title similarity + 0.30 × content similarity + 0.10 × topic
+  overlap + 0.10 × geographic overlap`; require either shared topic/geography or
+  title similarity of at least `0.55`; assign the same event at a score of at least
+  `0.62`, propose review from `0.52` through `0.6199`, and otherwise keep reports
+  distinct. Missing publication time MUST use ingestion time. All values MUST be
+  configurable and recorded with the decision.
 - **FR-012**: Duplicate and event-group decisions MUST retain enough evidence to be
   reviewed and corrected.
 - **FR-013**: The system MUST enrich eligible articles with validated structured
@@ -163,7 +193,11 @@ changing article definitions or aggregation rules.
   enabled sources from completing their work.
 - **FR-018**: The system MUST allow supported sources and regions to be added or
   reconfigured without changing the common article definition or aggregation
-  rules.
+  rules. Operators MUST manage sources through a versioned JSON catalog contract
+  with validation-only and transactional apply modes. Apply MUST upsert listed
+  sources by stable identifier, leave omitted sources unchanged, support explicit
+  enable/disable updates, reject the entire catalog on any invalid or duplicate
+  entry, and report a sanitized add/update/unchanged summary.
 - **FR-019**: Source retrieval, record conversion, duplicate detection, enrichment,
   and cycle coordination MUST be independently replaceable capabilities.
 - **FR-020**: The aggregation feature MUST NOT load user preference profiles,
@@ -172,6 +206,13 @@ changing article definitions or aggregation rules.
 - **FR-021**: Collection and analysis outcomes MUST record source, article, stage,
   status, and diagnostic context without exposing secrets or unnecessary source
   payload data.
+- **FR-022**: The application MUST schedule aggregation at a configurable scan
+  interval, process only sources whose individual polling interval is due, and
+  attempt each due source within one scan interval. Application startup and
+  shutdown MUST start and stop scheduling outside Telegram message handlers.
+- **FR-023**: A PostgreSQL advisory lock MUST prevent overlapping collection
+  cycles. A tick that cannot acquire the lock MUST return and record an
+  `already_running` outcome without starting source work.
 
 ### Constitution Alignment *(mandatory)*
 
@@ -233,6 +274,12 @@ changing article definitions or aggregation rules.
 - **SC-009**: At least 95% of successful collection cycles make their newly
   available article set ready for downstream use within 10 minutes of receiving
   the final source response.
+- **SC-010**: 100% of due enabled sources are attempted within one configured
+  scheduler scan interval, and concurrent scheduler ticks produce no overlapping
+  collection cycles.
+- **SC-011**: For a valid source catalog, operators can preview and apply add,
+  update, enable, and disable changes in one command; for an invalid catalog, zero
+  source records are changed.
 
 ## Assumptions
 
@@ -249,4 +296,3 @@ changing article definitions or aggregation rules.
   rejected, and successfully produced metadata.
 - Personal ranking, digest representative selection, Telegram presentation, and
   user preference management are outside this feature's scope.
-

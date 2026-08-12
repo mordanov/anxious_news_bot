@@ -43,9 +43,7 @@ def test_sanitized_fields_remove_url_userinfo_secret_queries_and_fragments() -> 
                 "https://feed-user:feed-password@example.com/rss?"
                 "api_key=query-secret&region=es#private-fragment"
             ),
-            "nested": {
-                "callback": "https://example.com/hook?token=nested-secret&ok=1"
-            },
+            "nested": {"callback": "https://example.com/hook?token=nested-secret&ok=1"},
         }
     )
 

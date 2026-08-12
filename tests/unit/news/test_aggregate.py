@@ -8,15 +8,14 @@ from decimal import Decimal
 from uuid import UUID, uuid4
 
 from anxious_news_bot.news.domain import (
-    AnalysisStatus,
     AggregationStatus,
+    AnalysisStatus,
     CollectionCycle,
     ConditionalHeaders,
     CycleStatus,
     DecisionOutcome,
     DecisionType,
     EventGroup,
-    EventGroupStatus,
     FetchResult,
     FetchStatus,
     NewsSource,
@@ -110,9 +109,7 @@ class FakeRepository:
     def __init__(self, sources: list[NewsSource], *, lock: bool = True) -> None:
         self.sources = sources
         self.lock = lock
-        self.cycle = CollectionCycle(
-            uuid4(), CycleStatus.RUNNING, NOW, "test"
-        )
+        self.cycle = CollectionCycle(uuid4(), CycleStatus.RUNNING, NOW, "test")
         self.runs: dict[UUID, dict[str, object]] = {}
         self.articles: dict[str, object] = {}
         self.final_cycle: dict[str, object] = {}
@@ -149,18 +146,21 @@ class FakeRepository:
         return [
             source
             for source in self.sources
-            if source.enabled and (source.next_poll_at is None or source.next_poll_at <= now)
+            if source.enabled
+            and (source.next_poll_at is None or source.next_poll_at <= now)
         ]
 
     async def create_source_run(
         self, cycle_id: UUID, source_id: UUID, started_at: datetime
     ):
-        run = SourceRun(uuid4(), cycle_id, source_id, SourceRunStatus.PENDING, started_at)
+        run = SourceRun(
+            uuid4(), cycle_id, source_id, SourceRunStatus.PENDING, started_at
+        )
         self.runs[source_id] = {}
         return run
 
     async def finalize_source_run(self, source_run_id: UUID, **changes: object):
-        for source_id, values in self.runs.items():
+        for _source_id, values in self.runs.items():
             if not values or values.get("id") == source_run_id:
                 values.update(changes)
                 values["id"] = source_run_id
@@ -239,11 +239,7 @@ class FakeRepository:
         wanted = set(article_ids)
         return tuple(
             sorted(
-                (
-                    article
-                    for article in self.articles.values()
-                    if article.id in wanted
-                ),
+                (article for article in self.articles.values() if article.id in wanted),
                 key=lambda article: article.id,
             )
         )
@@ -260,15 +256,11 @@ class FakeRepository:
             if article.canonical_url != candidate.canonical_url
         )[:limit]
 
-    async def find_event_candidates(
-        self, article, limit: int, window_hours: int
-    ):
+    async def find_event_candidates(self, article, limit: int, window_hours: int):
         del window_hours
         return tuple(
             candidate
-            for candidate in sorted(
-                self.articles.values(), key=lambda item: item.id
-            )
+            for candidate in sorted(self.articles.values(), key=lambda item: item.id)
             if candidate.id != article.id
         )[:limit]
 
@@ -390,7 +382,13 @@ def make_source(
 async def test_cycle_isolates_sources_records_rejections_and_returns_only_new() -> None:
     disabled = make_source("disabled", enabled=False)
     future = make_source("future", due=datetime(2026, 8, 13, tzinfo=UTC))
-    sources = [make_source("one"), make_source("two"), make_source("failed"), disabled, future]
+    sources = [
+        make_source("one"),
+        make_source("two"),
+        make_source("failed"),
+        disabled,
+        future,
+    ]
     repository = FakeRepository(sources)
     aggregator = DefaultNewsAggregator(
         repository,
@@ -412,7 +410,13 @@ async def test_cycle_isolates_sources_records_rejections_and_returns_only_new() 
     assert disabled.id not in repository.poll_updates
     assert future.id not in repository.poll_updates
     assert len(repository.poll_updates) == 6
-    assert sum(getattr(record, "rejection_code", None) == "missing_title" for record in repository.records) == 4
+    assert (
+        sum(
+            getattr(record, "rejection_code", None) == "missing_title"
+            for record in repository.records
+        )
+        == 4
+    )
 
 
 async def test_cycle_returns_already_running_without_creating_cycle() -> None:
@@ -469,7 +473,9 @@ async def test_failed_post_processing_is_recovered_without_new_articles() -> Non
     assert repository.post_processed == {article_id}
 
 
-async def test_cycle_persists_duplicate_and_event_evidence_after_concurrent_ingestion() -> None:
+async def test_cycle_persists_duplicate_and_event_evidence_after_concurrent_ingestion() -> (
+    None
+):
     repository = FakeRepository(
         [
             make_source("duplicate-one"),
@@ -485,10 +491,10 @@ async def test_cycle_persists_duplicate_and_event_evidence_after_concurrent_inge
         FixedClock(),
         deduplicator=DeterministicArticleDeduplicator(),
         event_grouper=DeterministicEventGrouper(
-            title_weight=Decimal("1"),
-            content_weight=Decimal("0"),
-            topic_weight=Decimal("0"),
-            geography_weight=Decimal("0"),
+            title_weight=Decimal(1),
+            content_weight=Decimal(0),
+            topic_weight=Decimal(0),
+            geography_weight=Decimal(0),
         ),
         max_concurrency=4,
     )

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from datetime import timedelta
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import ROUND_HALF_UP, Decimal
 
 from anxious_news_bot.news.domain import (
     DecisionOutcome,
@@ -74,7 +74,10 @@ class DeterministicEventGrouper:
         article_basis = "published_at" if article.published_at else "ingested_at"
 
         for candidate in sorted(candidates, key=lambda item: item.id.int):
-            if candidate.id == article.id or candidate.primary_source_id == article.primary_source_id:
+            if (
+                candidate.id == article.id
+                or candidate.primary_source_id == article.primary_source_id
+            ):
                 excluded["same_source"] += 1
                 continue
             if candidate.language_code != article.language_code:
@@ -100,9 +103,7 @@ class DeterministicEventGrouper:
                 + self._weights["geography"] * geography_score
             ).quantize(_SCORE_QUANTUM, rounding=ROUND_HALF_UP)
             shared_metadata = topic_score > 0 or geography_score > 0
-            anchor_passed = (
-                shared_metadata or title_score >= self._anchor_threshold
-            )
+            anchor_passed = shared_metadata or title_score >= self._anchor_threshold
             if anchor_passed and score >= self._assignment_threshold:
                 outcome = DecisionOutcome.SAME_EVENT
                 priority = 2
@@ -119,9 +120,7 @@ class DeterministicEventGrouper:
                 "time_basis": {
                     "article": article_basis,
                     "candidate": (
-                        "published_at"
-                        if candidate.published_at
-                        else "ingested_at"
+                        "published_at" if candidate.published_at else "ingested_at"
                     ),
                 },
                 "signals": {
@@ -144,7 +143,9 @@ class DeterministicEventGrouper:
                 },
                 "source_urls": [
                     item.canonical_url
-                    for item in sorted((article, candidate), key=lambda item: item.id.int)
+                    for item in sorted(
+                        (article, candidate), key=lambda item: item.id.int
+                    )
                 ],
             }
             if (

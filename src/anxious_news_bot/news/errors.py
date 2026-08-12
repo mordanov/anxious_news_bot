@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, Mapping
+from typing import Any
 
 _SENSITIVE_KEYS = frozenset(
     {
@@ -45,8 +46,7 @@ def is_sensitive_key(key: object) -> bool:
             "token",
         )
     ) or any(
-        "".join(character for character in marker if character.isalnum())
-        in normalized
+        "".join(character for character in marker if character.isalnum()) in normalized
         for marker in _SENSITIVE_KEYS
     )
 
@@ -77,7 +77,7 @@ class DiagnosticContext:
     values: Mapping[str, Any]
 
     @classmethod
-    def sanitized(cls, values: Mapping[str, Any] | None) -> "DiagnosticContext":
+    def sanitized(cls, values: Mapping[str, Any] | None) -> DiagnosticContext:
         return cls(_safe_value(values or {}))
 
     def as_dict(self) -> dict[str, Any]:

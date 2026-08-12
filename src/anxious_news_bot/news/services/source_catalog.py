@@ -1,16 +1,15 @@
 from __future__ import annotations
 
+import re
 from collections.abc import Mapping, Sequence
 from contextlib import AbstractAsyncContextManager
 from dataclasses import dataclass
 from decimal import Decimal
-import re
-from typing import Any, Protocol
+from typing import Any, Literal, Protocol
 from urllib.parse import urlsplit, urlunsplit
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
-from typing_extensions import Literal
 
 from anxious_news_bot.news.domain import (
     ConditionalHeaders,
@@ -150,7 +149,7 @@ class _CatalogSourceModel(BaseModel):
         ):
             raise ValueError("must be an HTTP(S) URI")
         try:
-            parsed.port
+            _ = parsed.port
         except ValueError as exc:
             raise ValueError("must contain a valid port") from exc
         return value
@@ -193,9 +192,7 @@ class SourceAdapterRegistry:
                 f"no adapter registered for source type {source_type.value}"
             ) from exc
         if not hasattr(adapter, "fetch"):
-            raise TypeError(
-                f"adapter for source type {source_type.value} cannot fetch"
-            )
+            raise TypeError(f"adapter for source type {source_type.value} cannot fetch")
         return adapter  # type: ignore[return-value]
 
 
@@ -213,7 +210,7 @@ class SourceAdapterRouter:
 
 
 class CatalogRepository(Protocol):
-    def unit_of_work(self) -> AbstractAsyncContextManager["CatalogRepository"]: ...
+    def unit_of_work(self) -> AbstractAsyncContextManager[CatalogRepository]: ...
 
     async def plan_source_catalog(
         self, entries: Sequence[CatalogSource]

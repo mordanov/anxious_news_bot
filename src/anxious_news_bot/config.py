@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 import math
 import os
+from dataclasses import dataclass
 from urllib.parse import urlsplit
 
 
@@ -99,7 +99,7 @@ class Settings:
     news_event_review_threshold: float = 0.52
 
     @classmethod
-    def from_env(cls) -> "Settings":
+    def from_env(cls) -> Settings:
         tracking_parameters = tuple(
             sorted(
                 {
@@ -145,27 +145,15 @@ class Settings:
                 "NEWS_NEAR_DUPLICATE_REVIEW_THRESHOLD", 0.72
             ),
             news_event_window_hours=_integer("NEWS_EVENT_WINDOW_HOURS", 48),
-            news_event_title_weight=_threshold(
-                "NEWS_EVENT_TITLE_WEIGHT", 0.50
-            ),
-            news_event_content_weight=_threshold(
-                "NEWS_EVENT_CONTENT_WEIGHT", 0.30
-            ),
-            news_event_topic_weight=_threshold(
-                "NEWS_EVENT_TOPIC_WEIGHT", 0.10
-            ),
-            news_event_geography_weight=_threshold(
-                "NEWS_EVENT_GEOGRAPHY_WEIGHT", 0.10
-            ),
-            news_event_anchor_threshold=_threshold(
-                "NEWS_EVENT_ANCHOR_THRESHOLD", 0.55
-            ),
+            news_event_title_weight=_threshold("NEWS_EVENT_TITLE_WEIGHT", 0.50),
+            news_event_content_weight=_threshold("NEWS_EVENT_CONTENT_WEIGHT", 0.30),
+            news_event_topic_weight=_threshold("NEWS_EVENT_TOPIC_WEIGHT", 0.10),
+            news_event_geography_weight=_threshold("NEWS_EVENT_GEOGRAPHY_WEIGHT", 0.10),
+            news_event_anchor_threshold=_threshold("NEWS_EVENT_ANCHOR_THRESHOLD", 0.55),
             news_event_assignment_threshold=_threshold(
                 "NEWS_EVENT_ASSIGNMENT_THRESHOLD", 0.62
             ),
-            news_event_review_threshold=_threshold(
-                "NEWS_EVENT_REVIEW_THRESHOLD", 0.52
-            ),
+            news_event_review_threshold=_threshold("NEWS_EVENT_REVIEW_THRESHOLD", 0.52),
         )
         settings._validate()
         return settings
@@ -173,12 +161,9 @@ class Settings:
     def _validate(self) -> None:
         if not self.news_url_policy_version:
             raise RuntimeError("NEWS_URL_POLICY_VERSION must not be empty")
-        if (
-            self.news_near_duplicate_review_threshold
-            > min(
-                self.news_near_duplicate_title_threshold,
-                self.news_near_duplicate_content_threshold,
-            )
+        if self.news_near_duplicate_review_threshold > min(
+            self.news_near_duplicate_title_threshold,
+            self.news_near_duplicate_content_threshold,
         ):
             raise RuntimeError(
                 "NEWS_NEAR_DUPLICATE_REVIEW_THRESHOLD must not exceed "

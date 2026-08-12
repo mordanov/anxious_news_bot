@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from contextlib import asynccontextmanager
 from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
@@ -52,7 +52,7 @@ class Database:
             self._closed = True
             await self._engine.dispose()
 
-    async def __aenter__(self) -> "Database":
+    async def __aenter__(self) -> Database:
         return self
 
     async def __aexit__(self, *_: object) -> None:

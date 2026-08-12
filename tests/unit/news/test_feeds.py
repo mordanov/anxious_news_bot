@@ -112,9 +112,9 @@ async def test_feed_fetcher_maps_timeout_after_bounded_retries() -> None:
 
     async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
         with pytest.raises(SourceUnavailable) as error:
-            await FeedFetcher(
-                client, retry_attempts=2, backoff_base_seconds=0
-            ).fetch(source(), ConditionalHeaders())
+            await FeedFetcher(client, retry_attempts=2, backoff_base_seconds=0).fetch(
+                source(), ConditionalHeaders()
+            )
 
     assert attempts == 2
     assert error.value.code == "source_timeout"

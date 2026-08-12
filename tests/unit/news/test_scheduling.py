@@ -52,9 +52,7 @@ async def test_application_starts_scheduler_and_closes_resources(monkeypatch) ->
     monkeypatch.setattr(
         app_module, "AggregationScheduler", Mock(return_value=scheduler)
     )
-    application = app_module.build_application(
-        Settings(telegram_bot_token="123:ABC")
-    )
+    application = app_module.build_application(Settings(telegram_bot_token="123:ABC"))
 
     assert application.post_init is not None
     assert application.post_shutdown is not None

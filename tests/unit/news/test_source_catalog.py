@@ -1,6 +1,5 @@
 from contextlib import asynccontextmanager
 from copy import deepcopy
-from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
 import pytest
@@ -18,7 +17,6 @@ from anxious_news_bot.news.services.source_catalog import (
     SourceAdapterRouter,
     SourceCatalogService,
 )
-
 
 SOURCE_ID = uuid4()
 
@@ -87,9 +85,7 @@ def test_new_regions_are_accepted_but_unsupported_adapters_are_rejected() -> Non
     unsupported = service.validate(catalog(source_type="atom"))
 
     assert not unsupported.valid
-    assert [error.code for error in unsupported.errors] == [
-        "unsupported_source_type"
-    ]
+    assert [error.code for error in unsupported.errors] == ["unsupported_source_type"]
 
 
 class RecordingAdapter:
@@ -106,9 +102,7 @@ class RecordingAdapter:
 async def test_adapter_router_selects_by_type_without_region_logic() -> None:
     rss = RecordingAdapter("rss")
     atom = RecordingAdapter("atom")
-    registry = SourceAdapterRegistry(
-        {SourceType.RSS: rss, SourceType.ATOM: atom}
-    )
+    registry = SourceAdapterRegistry({SourceType.RSS: rss, SourceType.ATOM: atom})
     router = SourceAdapterRouter(registry)
     source = NewsSource(
         SOURCE_ID,

@@ -1,24 +1,24 @@
 import logging
+from decimal import Decimal
 
 import httpx
-from decimal import Decimal
 from telegram import Update
 from telegram.ext import Application, CommandHandler, ContextTypes
 
 from anxious_news_bot.config import Settings
 from anxious_news_bot.logging import configure_logging
+from anxious_news_bot.news.domain import SourceType
 from anxious_news_bot.news.infrastructure.database import Database
 from anxious_news_bot.news.infrastructure.feeds import FeedFetcher
 from anxious_news_bot.news.infrastructure.persistence import SQLAlchemyNewsRepository
 from anxious_news_bot.news.infrastructure.scheduling import AggregationScheduler
-from anxious_news_bot.news.domain import SourceType
 from anxious_news_bot.news.services.aggregate import DefaultNewsAggregator, SystemClock
 from anxious_news_bot.news.services.canonicalize import CanonicalURLPolicy
-from anxious_news_bot.news.services.normalize import DeterministicArticleNormalizer
 from anxious_news_bot.news.services.deduplicate import (
     DeterministicArticleDeduplicator,
 )
 from anxious_news_bot.news.services.event_grouping import DeterministicEventGrouper
+from anxious_news_bot.news.services.normalize import DeterministicArticleNormalizer
 from anxious_news_bot.news.services.source_catalog import (
     SourceAdapterRegistry,
     SourceAdapterRouter,
@@ -36,9 +36,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text(START_MESSAGE)
 
 
-async def handle_error(
-    update: object, context: ContextTypes.DEFAULT_TYPE
-) -> None:
+async def handle_error(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
     LOGGER.error(
         "telegram_update_failed",
         exc_info=(
@@ -80,9 +78,7 @@ def build_application(settings: Settings) -> Application:
         normalizer,
         SystemClock(),
         deduplicator=DeterministicArticleDeduplicator(
-            title_threshold=Decimal(
-                str(settings.news_near_duplicate_title_threshold)
-            ),
+            title_threshold=Decimal(str(settings.news_near_duplicate_title_threshold)),
             content_threshold=Decimal(
                 str(settings.news_near_duplicate_content_threshold)
             ),
@@ -98,18 +94,10 @@ def build_application(settings: Settings) -> Application:
             title_weight=Decimal(str(settings.news_event_title_weight)),
             content_weight=Decimal(str(settings.news_event_content_weight)),
             topic_weight=Decimal(str(settings.news_event_topic_weight)),
-            geography_weight=Decimal(
-                str(settings.news_event_geography_weight)
-            ),
-            anchor_threshold=Decimal(
-                str(settings.news_event_anchor_threshold)
-            ),
-            assignment_threshold=Decimal(
-                str(settings.news_event_assignment_threshold)
-            ),
-            review_threshold=Decimal(
-                str(settings.news_event_review_threshold)
-            ),
+            geography_weight=Decimal(str(settings.news_event_geography_weight)),
+            anchor_threshold=Decimal(str(settings.news_event_anchor_threshold)),
+            assignment_threshold=Decimal(str(settings.news_event_assignment_threshold)),
+            review_threshold=Decimal(str(settings.news_event_review_threshold)),
         ),
         event_window_hours=settings.news_event_window_hours,
         max_concurrency=settings.news_max_concurrency,

@@ -12,7 +12,6 @@ from anxious_news_bot.news.infrastructure.database import Database
 from anxious_news_bot.news.infrastructure.persistence import SQLAlchemyNewsRepository
 from anxious_news_bot.news.services.source_catalog import CatalogSource
 
-
 NOW = datetime(2026, 8, 12, 12, tzinfo=UTC)
 
 

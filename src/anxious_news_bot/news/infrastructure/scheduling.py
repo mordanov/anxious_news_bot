@@ -44,4 +44,3 @@ class AggregationScheduler:
         result = await self._aggregator.run_cycle()
         if result.status is AggregationStatus.ALREADY_RUNNING:
             LOGGER.info("news_cycle_already_running")
-

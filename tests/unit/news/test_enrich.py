@@ -111,7 +111,7 @@ async def test_wholly_invalid_result_degrades_without_metadata() -> None:
             {
                 "schema_version": "1.0",
                 "status": "complete",
-                "sections": {"importance": Decimal("2")},
+                "sections": {"importance": Decimal(2)},
             }
         )
     ).enrich_article(article())

@@ -280,9 +280,7 @@ class SQLAlchemyNewsRepository:
             )
         )
 
-    async def list_due_sources(
-        self, now: datetime
-    ) -> tuple[domain.NewsSource, ...]:
+    async def list_due_sources(self, now: datetime) -> tuple[domain.NewsSource, ...]:
         rows = (
             await self._require_session().scalars(
                 select(models.NewsSource)
@@ -327,7 +325,10 @@ class SQLAlchemyNewsRepository:
                 unchanged.append(entry.id)
             else:
                 updated.append(entry.id)
-        key = lambda value: value.int
+
+        def key(value: UUID) -> int:
+            return value.int
+
         return CatalogChangePlan(
             added=tuple(sorted(added, key=key)),
             updated=tuple(sorted(updated, key=key)),
@@ -404,9 +405,7 @@ class SQLAlchemyNewsRepository:
                 status=domain.SourceRunStatus.PENDING,
                 started_at=started_at,
             )
-            .on_conflict_do_nothing(
-                constraint="uq_source_runs_cycle_source"
-            )
+            .on_conflict_do_nothing(constraint="uq_source_runs_cycle_source")
             .returning(models.SourceRun.id)
         )
         resolved_id = result.scalar_one_or_none()
@@ -427,9 +426,7 @@ class SQLAlchemyNewsRepository:
             raise RuntimeError("source run could not be resolved")
         return _source_run(row)
 
-    async def finalize_source_run(
-        self, source_run_id: UUID, **changes: Any
-    ) -> None:
+    async def finalize_source_run(self, source_run_id: UUID, **changes: Any) -> None:
         values = dict(changes)
         if "status" in values:
             values["status"] = domain.SourceRunStatus(values["status"])
@@ -524,8 +521,7 @@ class SQLAlchemyNewsRepository:
         if record.external_id is not None:
             existing_observation = await session.scalar(
                 select(models.SourceArticleRecord).where(
-                    models.SourceArticleRecord.source_run_id
-                    == record.source_run_id,
+                    models.SourceArticleRecord.source_run_id == record.source_run_id,
                     models.SourceArticleRecord.source_id == record.source_id,
                     models.SourceArticleRecord.external_id == record.external_id,
                 )
@@ -533,17 +529,14 @@ class SQLAlchemyNewsRepository:
         if existing_observation is None:
             existing_observation = await session.scalar(
                 select(models.SourceArticleRecord).where(
-                    models.SourceArticleRecord.source_run_id
-                    == record.source_run_id,
+                    models.SourceArticleRecord.source_run_id == record.source_run_id,
                     models.SourceArticleRecord.source_id == record.source_id,
                     models.SourceArticleRecord.payload_hash == record.payload_hash,
                 )
             )
         if existing_observation is not None:
             if existing_observation.article_id is None:
-                raise RuntimeError(
-                    "accepted source observation is missing its article"
-                )
+                raise RuntimeError("accepted source observation is missing its article")
             article_row = await session.get(
                 models.NormalizedArticle, existing_observation.article_id
             )
@@ -592,9 +585,7 @@ class SQLAlchemyNewsRepository:
         article = _article(existing_article) if existing_article is not None else None
         created = False
         if article is None:
-            article, created = await self.insert_or_resolve_article(
-                candidate, cycle_id
-            )
+            article, created = await self.insert_or_resolve_article(candidate, cycle_id)
         values = {
             "id": record.id,
             "source_run_id": record.source_run_id,
@@ -608,8 +599,7 @@ class SQLAlchemyNewsRepository:
             "article_id": article.id,
             "status": (
                 domain.ProvenanceStatus.DUPLICATE
-                if not created
-                and record.status is domain.ProvenanceStatus.ACCEPTED
+                if not created and record.status is domain.ProvenanceStatus.ACCEPTED
                 else record.status
             ),
         }
@@ -633,8 +623,7 @@ class SQLAlchemyNewsRepository:
             row = await session.scalar(
                 select(models.SourceArticleRecord)
                 .where(
-                    models.SourceArticleRecord.source_run_id
-                    == record.source_run_id,
+                    models.SourceArticleRecord.source_run_id == record.source_run_id,
                     models.SourceArticleRecord.source_id == record.source_id,
                     models.SourceArticleRecord.external_id == record.external_id,
                 )
@@ -644,8 +633,7 @@ class SQLAlchemyNewsRepository:
             row = await session.scalar(
                 select(models.SourceArticleRecord)
                 .where(
-                    models.SourceArticleRecord.source_run_id
-                    == record.source_run_id,
+                    models.SourceArticleRecord.source_run_id == record.source_run_id,
                     models.SourceArticleRecord.source_id == record.source_id,
                     models.SourceArticleRecord.payload_hash == record.payload_hash,
                 )
@@ -784,15 +772,11 @@ class SQLAlchemyNewsRepository:
                     models.NormalizedArticle.primary_source_id
                     != article.primary_source_id,
                     models.NormalizedArticle.language_code == article.language_code,
-                    effective_time
-                    >= event_time - timedelta(hours=window_hours),
-                    effective_time
-                    <= event_time + timedelta(hours=window_hours),
+                    effective_time >= event_time - timedelta(hours=window_hours),
+                    effective_time <= event_time + timedelta(hours=window_hours),
                 )
                 .order_by(
-                    func.abs(
-                        func.extract("epoch", effective_time - event_time)
-                    ),
+                    func.abs(func.extract("epoch", effective_time - event_time)),
                     models.NormalizedArticle.id,
                 )
                 .limit(limit)
@@ -825,9 +809,7 @@ class SQLAlchemyNewsRepository:
                 evidence=dict(decision.evidence),
                 decided_at=decision.decided_at,
             )
-            .on_conflict_do_nothing(
-                constraint="uq_decisions_pair_type_version"
-            )
+            .on_conflict_do_nothing(constraint="uq_decisions_pair_type_version")
             .returning(models.DeduplicationDecision.id)
         )
         inserted_id = result.scalar_one_or_none()

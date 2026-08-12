@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from collections.abc import Sequence
-from decimal import Decimal, ROUND_HALF_UP
-from difflib import SequenceMatcher
 import re
 import unicodedata
+from collections.abc import Sequence
+from decimal import ROUND_HALF_UP, Decimal
+from difflib import SequenceMatcher
 
 from anxious_news_bot.news.domain import (
     DecisionOutcome,
@@ -69,11 +69,7 @@ class DeterministicArticleDeduplicator:
         }
         order = [str(item.id) for item in ordered]
         exact = next(
-            (
-                item
-                for item in ordered
-                if item.canonical_url == candidate.canonical_url
-            ),
+            (item for item in ordered if item.canonical_url == candidate.canonical_url),
             None,
         )
         if exact is not None:
@@ -89,7 +85,9 @@ class DeterministicArticleDeduplicator:
             )
 
         comparisons: list[
-            tuple[int, Decimal, int, NormalizedArticle, Decimal, Decimal, DecisionOutcome]
+            tuple[
+                int, Decimal, int, NormalizedArticle, Decimal, Decimal, DecisionOutcome
+            ]
         ] = []
         for item in ordered:
             title_score = text_similarity(candidate.title, item.title)
@@ -157,4 +155,3 @@ class DeterministicArticleDeduplicator:
     @staticmethod
     def _format(value: Decimal) -> str:
         return str(value.quantize(_SCORE_QUANTUM, rounding=ROUND_HALF_UP))
-

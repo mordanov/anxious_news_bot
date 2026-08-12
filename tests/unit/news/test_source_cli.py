@@ -46,9 +46,7 @@ async def test_validate_cli_reads_json_and_reports_sanitized_success(
     monkeypatch.setattr(
         cli.Path,
         "read_text",
-        lambda self, encoding: json.dumps(
-            {"schema_version": "1.0", "sources": []}
-        ),
+        lambda self, encoding: json.dumps({"schema_version": "1.0", "sources": []}),
     )
     output = StringIO()
 
@@ -91,9 +89,7 @@ async def test_apply_cli_supports_dry_run_without_exposing_catalog_values(
 async def test_cli_returns_nonzero_for_invalid_json(monkeypatch) -> None:
     from anxious_news_bot.news import cli
 
-    monkeypatch.setattr(
-        cli.Path, "read_text", lambda self, encoding: "{not-json"
-    )
+    monkeypatch.setattr(cli.Path, "read_text", lambda self, encoding: "{not-json")
     errors = StringIO()
 
     status = await cli.run_cli(

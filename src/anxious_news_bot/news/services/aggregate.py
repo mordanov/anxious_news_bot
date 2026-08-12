@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+import logging
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Any
@@ -27,15 +28,17 @@ from anxious_news_bot.news.domain import (
 )
 from anxious_news_bot.news.errors import DiagnosticContext, NewsError
 from anxious_news_bot.news.ports import (
+    ArticleDeduplicator,
     ArticleEnricher,
     ArticleNormalizer,
-    ArticleDeduplicator,
     Clock,
     EventGrouper,
     NewsFetcher,
     NewsRepository,
 )
 from anxious_news_bot.news.services.enrich import ArticleEnrichmentService
+
+LOGGER = logging.getLogger(__name__)
 
 
 class SystemClock:
@@ -127,9 +130,7 @@ class DefaultNewsAggregator:
         try:
             started_at = self._clock.now()
             async with self._repository.unit_of_work() as work:
-                cycle = await work.create_cycle(
-                    started_at, self._configuration_version
-                )
+                cycle = await work.create_cycle(started_at, self._configuration_version)
                 cycle_id = cycle.id
                 sources = tuple(await work.list_due_sources(started_at))
 
@@ -143,17 +144,14 @@ class DefaultNewsAggregator:
             success_count = sum(success for success, _ in outcomes)
             failure_count = len(outcomes) - success_count
             created_ids = tuple(
-                article_id
-                for _, article_ids in outcomes
-                for article_id in article_ids
+                article_id for _, article_ids in outcomes for article_id in article_ids
             )
             async with self._repository.unit_of_work() as work:
                 post_processing_ids = tuple(
                     await work.pending_post_processing_article_ids()
                 )
             if post_processing_ids and (
-                self._deduplicator is not None
-                or self._event_grouper is not None
+                self._deduplicator is not None or self._event_grouper is not None
             ):
                 await self._consolidate_articles(post_processing_ids)
             if post_processing_ids and self._enrichment_service is not None:
@@ -209,9 +207,7 @@ class DefaultNewsAggregator:
         observed_at = self._clock.now()
         created_ids: list[UUID] = []
         async with self._repository.unit_of_work() as work:
-            source_run = await work.create_source_run(
-                cycle_id, source.id, observed_at
-            )
+            source_run = await work.create_source_run(cycle_id, source.id, observed_at)
             await work.finalize_source_run(
                 source_run.id, status=SourceRunStatus.FETCHING.value
             )
@@ -251,9 +247,7 @@ class DefaultNewsAggregator:
                 accepted_count = 0
                 rejected_count = 0
                 for raw in result.records:
-                    normalization = self._normalizer.normalize(
-                        source, raw, observed_at
-                    )
+                    normalization = self._normalizer.normalize(source, raw, observed_at)
                     if not normalization.accepted:
                         rejected_count += 1
                         await work.record_source_article(
@@ -286,10 +280,8 @@ class DefaultNewsAggregator:
                         observed_at=observed_at,
                         status=ProvenanceStatus.ACCEPTED,
                     )
-                    article, created, _ = (
-                        await work.ingest_source_article(
-                            candidate, provenance, cycle_id
-                        )
+                    article, created, _ = await work.ingest_source_article(
+                        candidate, provenance, cycle_id
                     )
                     accepted_count += 1
                     if created:
@@ -303,9 +295,7 @@ class DefaultNewsAggregator:
                 )
                 return True, tuple(created_ids)
         except asyncio.CancelledError:
-            await asyncio.shield(
-                self._finalize_cancelled_source(source_run.id)
-            )
+            await asyncio.shield(self._finalize_cancelled_source(source_run.id))
             raise
         except NewsError as exc:
             async with self._repository.unit_of_work() as work:
@@ -346,9 +336,7 @@ class DefaultNewsAggregator:
                 error_context={},
             )
 
-    async def _consolidate_articles(
-        self, article_ids: tuple[UUID, ...]
-    ) -> None:
+    async def _consolidate_articles(self, article_ids: tuple[UUID, ...]) -> None:
         async with self._repository.unit_of_work() as work:
             articles = tuple(await work.get_articles(article_ids))
             for article in sorted(articles, key=lambda item: item.id.int):
@@ -381,13 +369,9 @@ class DefaultNewsAggregator:
                     await self._record_duplicate_decision(
                         work, article.id, duplicate_result
                     )
-                if (
-                    self._event_grouper is not None
-                    and (
-                        duplicate_result is None
-                        or duplicate_result.outcome
-                        is not DecisionOutcome.DUPLICATE
-                    )
+                if self._event_grouper is not None and (
+                    duplicate_result is None
+                    or duplicate_result.outcome is not DecisionOutcome.DUPLICATE
                 ):
                     await self._group_article_event(work, article)
 
@@ -402,7 +386,10 @@ class DefaultNewsAggregator:
             except asyncio.CancelledError:
                 raise
             except Exception:
-                continue
+                LOGGER.exception(
+                    "article_enrichment_persistence_failed",
+                    extra={"article_id": str(article.id)},
+                )
 
     async def _record_duplicate_decision(
         self,
@@ -476,9 +463,7 @@ class DefaultNewsAggregator:
                 right_article_id=matched.id,
                 decision_type=DecisionType.EVENT_RELATED,
                 outcome=result.outcome,
-                title_similarity=self._decimal_signal(
-                    signals.get("title_similarity")
-                ),
+                title_similarity=self._decimal_signal(signals.get("title_similarity")),
                 content_similarity=self._decimal_signal(
                     signals.get("content_similarity")
                 ),
@@ -512,8 +497,7 @@ class DefaultNewsAggregator:
         await work.update_source_polling(
             source.id,
             polled_at=polled_at,
-            next_poll_at=polled_at
-            + timedelta(seconds=source.polling_interval_seconds),
+            next_poll_at=polled_at + timedelta(seconds=source.polling_interval_seconds),
             etag=source.etag,
             last_modified=source.last_modified,
         )

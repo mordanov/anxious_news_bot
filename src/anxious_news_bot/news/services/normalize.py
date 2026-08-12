@@ -135,8 +135,7 @@ class DeterministicArticleNormalizer:
                 payload_hash=hashlib.sha256(encoded_payload).hexdigest(),
                 external_id=(
                     raw_article.external_id.strip()
-                    if raw_article.external_id
-                    and raw_article.external_id.strip()
+                    if raw_article.external_id and raw_article.external_id.strip()
                     else None
                 ),
             )
@@ -144,4 +143,3 @@ class DeterministicArticleNormalizer:
 
 
 ArticleNormalizer = DeterministicArticleNormalizer
-

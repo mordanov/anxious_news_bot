@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Mapping
+from collections.abc import Mapping
+from typing import Any
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 from uuid import UUID
 
 from anxious_news_bot.news.errors import DiagnosticContext, is_sensitive_key
+
 
 def _sanitize_url(value: str) -> str:
     parsed = urlsplit(value)
@@ -35,7 +37,9 @@ def _sanitize_urls(value: Any) -> Any:
 def sanitized_fields(fields: Mapping[str, Any] | None) -> dict[str, Any]:
     sanitized = _sanitize_urls(DiagnosticContext.sanitized(fields).as_dict())
     for key, value in tuple(sanitized.items()):
-        if isinstance(value, str) and ("url" in key.lower() or value.startswith(("http://", "https://"))):
+        if isinstance(value, str) and (
+            "url" in key.lower() or value.startswith(("http://", "https://"))
+        ):
             sanitized[key] = _sanitize_url(value)
     return sanitized
 
@@ -61,7 +65,11 @@ def log_news_event(
         "status": status[:80] if status else None,
     }
     context.update(sanitized_fields(fields))
-    logger.log(level, event, extra={"news": {k: v for k, v in context.items() if v is not None}})
+    logger.log(
+        level,
+        event,
+        extra={"news": {k: v for k, v in context.items() if v is not None}},
+    )
 
 
 def log_cycle(

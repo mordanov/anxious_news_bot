@@ -112,22 +112,18 @@ def test_weighted_score_and_shared_topic_anchor_are_recorded() -> None:
 
 def test_title_anchor_055_assignment_062_and_review_052_boundaries() -> None:
     assignment = DeterministicEventGrouper(
-        title_weight=Decimal("1"),
-        content_weight=Decimal("0"),
-        topic_weight=Decimal("0"),
-        geography_weight=Decimal("0"),
+        title_weight=Decimal(1),
+        content_weight=Decimal(0),
+        topic_weight=Decimal(0),
+        geography_weight=Decimal(0),
         anchor_threshold=Decimal("0.55"),
         assignment_threshold=Decimal("0.62"),
         review_threshold=Decimal("0.52"),
     )
     current = article(10, source=1, title="abcdefgh", group_id=None)
 
-    assigned = assignment.group_event(
-        current, [article(1, source=2, title="abcdeXYZ")]
-    )
-    review = assignment.group_event(
-        current, [article(2, source=3, title="abcdWXYZ")]
-    )
+    assigned = assignment.group_event(current, [article(1, source=2, title="abcdeXYZ")])
+    review = assignment.group_event(current, [article(2, source=3, title="abcdWXYZ")])
 
     assert assigned.score == Decimal("0.62500")
     assert assigned.outcome is DecisionOutcome.SAME_EVENT
@@ -135,10 +131,10 @@ def test_title_anchor_055_assignment_062_and_review_052_boundaries() -> None:
     assert review.outcome is DecisionOutcome.DISTINCT
 
     review_policy = DeterministicEventGrouper(
-        title_weight=Decimal("1"),
-        content_weight=Decimal("0"),
-        topic_weight=Decimal("0"),
-        geography_weight=Decimal("0"),
+        title_weight=Decimal(1),
+        content_weight=Decimal(0),
+        topic_weight=Decimal(0),
+        geography_weight=Decimal(0),
         anchor_threshold=Decimal("0.50"),
         assignment_threshold=Decimal("0.62"),
         review_threshold=Decimal("0.50"),
@@ -158,14 +154,14 @@ def test_exact_default_assignment_and_review_score_boundaries_are_inclusive() ->
     assignment = DeterministicEventGrouper(
         title_weight=Decimal("0.62"),
         content_weight=Decimal("0.38"),
-        topic_weight=Decimal("0"),
-        geography_weight=Decimal("0"),
+        topic_weight=Decimal(0),
+        geography_weight=Decimal(0),
     ).group_event(current, [match])
     review = DeterministicEventGrouper(
         title_weight=Decimal("0.52"),
         content_weight=Decimal("0.48"),
-        topic_weight=Decimal("0"),
-        geography_weight=Decimal("0"),
+        topic_weight=Decimal(0),
+        geography_weight=Decimal(0),
     ).group_event(current, [match])
 
     assert assignment.score == Decimal("0.62000")
@@ -189,10 +185,10 @@ def test_exact_default_title_anchor_boundary_is_inclusive() -> None:
         text="same",
     )
     result = DeterministicEventGrouper(
-        title_weight=Decimal("0"),
-        content_weight=Decimal("1"),
-        topic_weight=Decimal("0"),
-        geography_weight=Decimal("0"),
+        title_weight=Decimal(0),
+        content_weight=Decimal(1),
+        topic_weight=Decimal(0),
+        geography_weight=Decimal(0),
     ).group_event(current, [match])
 
     assert result.evidence["signals"]["title_similarity"] == "0.55000"
@@ -202,10 +198,10 @@ def test_exact_default_title_anchor_boundary_is_inclusive() -> None:
 
 def test_anchor_failure_prevents_assignment_even_with_high_weighted_score() -> None:
     grouper = DeterministicEventGrouper(
-        title_weight=Decimal("0"),
-        content_weight=Decimal("1"),
-        topic_weight=Decimal("0"),
-        geography_weight=Decimal("0"),
+        title_weight=Decimal(0),
+        content_weight=Decimal(1),
+        topic_weight=Decimal(0),
+        geography_weight=Decimal(0),
     )
     result = grouper.group_event(
         article(10, source=1, title="x", text="same", group_id=None),

@@ -130,4 +130,3 @@ def test_normalizer_returns_typed_rejections(
     assert not result.accepted
     assert result.rejection_code == code
     assert "title" not in result.diagnostic_context
-

@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import Decimal
 from enum import StrEnum
-from typing import Any, Mapping
+from typing import Any
 from uuid import UUID
 
 
@@ -254,9 +255,7 @@ class ArticleAnalysis:
             if len(values) > maximum_items or len(values) != len(set(values)):
                 raise ValueError(f"{name} must be bounded and unique")
             if any(
-                not isinstance(value, str)
-                or not value
-                or len(value) > maximum_length
+                not isinstance(value, str) or not value or len(value) > maximum_length
                 for value in values
             ):
                 raise ValueError(f"{name} contains an invalid value")
@@ -278,8 +277,7 @@ class ArticleAnalysis:
         ):
             value = getattr(self, name)
             if value is not None and (
-                not isinstance(value, Decimal)
-                or not Decimal("0") <= value <= Decimal("1")
+                not isinstance(value, Decimal) or not Decimal(0) <= value <= Decimal(1)
             ):
                 raise ValueError(f"{name} must be a Decimal between zero and one")
         if self.semantic_metadata is not None:

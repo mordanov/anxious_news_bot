@@ -4,8 +4,8 @@ import argparse
 import asyncio
 import json
 import os
-from pathlib import Path
 import sys
+from pathlib import Path
 from typing import TextIO
 
 from anxious_news_bot.news.domain import SourceType
@@ -31,9 +31,7 @@ def _parser() -> argparse.ArgumentParser:
 
 
 def _database_url() -> str:
-    value = os.getenv(
-        "DATABASE_URL", "postgresql+psycopg://localhost/anxious_news"
-    )
+    value = os.getenv("DATABASE_URL", "postgresql+psycopg://localhost/anxious_news")
     if value.startswith("postgres://"):
         return f"postgresql+psycopg://{value.removeprefix('postgres://')}"
     if value.startswith("postgresql://"):
@@ -72,9 +70,7 @@ async def run_cli(
     errors = stderr or sys.stderr
     arguments = _parser().parse_args(argv)
     try:
-        document = json.loads(
-            Path(arguments.file).read_text(encoding="utf-8")
-        )
+        document = json.loads(Path(arguments.file).read_text(encoding="utf-8"))
     except json.JSONDecodeError:
         print("invalid catalog JSON", file=errors)
         return 2

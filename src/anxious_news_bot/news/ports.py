@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, AsyncContextManager, Protocol, runtime_checkable
 from uuid import UUID
@@ -14,8 +14,8 @@ from anxious_news_bot.news.domain import (
     DeduplicationResult,
     EnrichmentResult,
     EventGroup,
-    EventGroupStatus,
     EventGroupingResult,
+    EventGroupStatus,
     FetchResult,
     NewsSource,
     NormalizationResult,
@@ -84,7 +84,7 @@ class Clock(Protocol):
 
 @runtime_checkable
 class NewsRepository(Protocol):
-    def unit_of_work(self) -> AsyncContextManager["NewsRepository"]: ...
+    def unit_of_work(self) -> AsyncContextManager[NewsRepository]: ...
 
     async def try_acquire_cycle_lock(self, lock_key: int) -> bool: ...
 
@@ -108,12 +108,12 @@ class NewsRepository(Protocol):
     async def list_due_sources(self, now: datetime) -> Sequence[NewsSource]: ...
 
     async def plan_source_catalog(
-        self, entries: Sequence["CatalogSource"]
-    ) -> "CatalogChangePlan": ...
+        self, entries: Sequence[CatalogSource]
+    ) -> CatalogChangePlan: ...
 
     async def upsert_source_catalog(
-        self, entries: Sequence["CatalogSource"]
-    ) -> "CatalogChangePlan": ...
+        self, entries: Sequence[CatalogSource]
+    ) -> CatalogChangePlan: ...
 
     async def create_source_run(
         self, cycle_id: UUID, source_id: UUID, started_at: datetime
@@ -181,7 +181,9 @@ class NewsRepository(Protocol):
 
     async def store_analysis(self, analysis: ArticleAnalysis) -> ArticleAnalysis: ...
 
-    async def article_ids_created_by_cycle(self, cycle_id: UUID) -> tuple[UUID, ...]: ...
+    async def article_ids_created_by_cycle(
+        self, cycle_id: UUID
+    ) -> tuple[UUID, ...]: ...
 
     async def pending_post_processing_article_ids(self) -> tuple[UUID, ...]: ...
 

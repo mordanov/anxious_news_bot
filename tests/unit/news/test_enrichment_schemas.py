@@ -4,8 +4,8 @@ import pytest
 from pydantic import ValidationError
 
 from anxious_news_bot.news.schemas import (
-    EnrichmentResultSchema,
     SECTION_ADAPTERS,
+    EnrichmentResultSchema,
 )
 
 
@@ -23,7 +23,7 @@ def valid_result() -> dict[str, object]:
             "event_type": "policy",
             "importance": Decimal("0.75"),
             "novelty": Decimal("0.5"),
-            "source_quality": Decimal("1"),
+            "source_quality": Decimal(1),
             "semantic_metadata": {
                 "representation_id": "article-embedding",
                 "model": "example-v1",

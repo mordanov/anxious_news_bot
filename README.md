@@ -26,6 +26,45 @@ export TELEGRAM_BOT_TOKEN='...'
 export DATABASE_URL='postgresql+psycopg://user:password@localhost/anxious_news'
 ```
 
+## Run with Docker Compose
+
+Copy the example environment and set a real BotFather token:
+
+```bash
+cp .env.example .env
+# Edit TELEGRAM_BOT_TOKEN in .env
+docker compose up --build
+```
+
+Compose starts PostgreSQL, waits for it to become healthy, creates the application
+database when it is missing, runs `alembic upgrade head`, and then starts the bot.
+Database data persists in the `postgres-data` volume.
+PostgreSQL is intentionally available only inside the Compose network to avoid
+conflicting with a local server; use the `docker compose exec postgres psql ...`
+command below when you need a database console.
+
+Send `/start` to the bot in Telegram to test message handling. `docker exec` opens
+an additional process inside the running container; it does not replace Telegram
+as the bot's chat interface. Useful operational commands are:
+
+```bash
+docker compose logs -f bot
+docker compose exec bot sh
+docker compose exec bot alembic current
+docker compose exec bot anxious-news-sources validate /app/sources.json
+docker compose exec postgres psql -U anxious_news -d anxious_news
+```
+
+To make a source catalog available to the CLI, copy it into the bot container:
+
+```bash
+docker compose cp sources.json bot:/app/sources.json
+docker compose exec bot anxious-news-sources apply /app/sources.json
+```
+
+Stop containers while preserving the database with `docker compose down`. Remove
+the test database volume as well with `docker compose down -v`.
+
 Operational settings include:
 
 | Variable | Default | Purpose |

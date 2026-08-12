@@ -34,7 +34,9 @@ async def seed_source(session, *, endpoint: str, due: datetime | None = None):
     return source
 
 
-async def test_migration_installs_extension_and_all_ingestion_tables(postgres_engine) -> None:
+async def test_migration_installs_extension_and_all_ingestion_tables(
+    postgres_engine,
+) -> None:
     async with postgres_engine.connect() as connection:
         extension = await connection.scalar(
             text("SELECT extname FROM pg_extension WHERE extname = 'pg_trgm'")
@@ -326,9 +328,7 @@ async def test_pending_post_processing_is_durable_and_retry_safe(
                 )
             )
         async with database.session() as session:
-            source = await seed_source(
-                session, endpoint=f"post-process-{uuid4().hex}"
-            )
+            source = await seed_source(session, endpoint=f"post-process-{uuid4().hex}")
             source_id = source.id
         async with repository.unit_of_work() as work:
             cycle = await work.create_cycle(NOW, "test")

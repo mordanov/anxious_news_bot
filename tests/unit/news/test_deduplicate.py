@@ -116,4 +116,3 @@ def test_unrelated_pair_is_distinct() -> None:
 
     assert result.outcome is DecisionOutcome.DISTINCT
     assert result.matched_article_id is None
-

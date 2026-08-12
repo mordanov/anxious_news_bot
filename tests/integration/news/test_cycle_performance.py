@@ -178,9 +178,7 @@ async def test_cycles_bound_concurrency_and_meet_ten_minute_readiness_slo() -> N
         result = await aggregator.run_cycle()
         assert result.status is AggregationStatus.COMPLETED
         assert len(result.article_ids) == 8
-        readiness_latencies.append(
-            repository.completed_at - fetcher.last_response_at
-        )
+        readiness_latencies.append(repository.completed_at - fetcher.last_response_at)
 
     ready_within_ten_minutes = sum(
         latency <= 10 * 60 for latency in readiness_latencies

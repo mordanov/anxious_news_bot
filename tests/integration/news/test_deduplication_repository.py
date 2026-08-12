@@ -1,8 +1,7 @@
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
-from uuid import UUID, uuid4
+from uuid import uuid4
 
-import pytest
 from sqlalchemy import func, select, text
 
 from anxious_news_bot.news.domain import (
@@ -78,7 +77,11 @@ async def test_pg_trgm_candidate_search_is_bounded_ranked_and_indexable(
         await reset_news_tables(database)
         source_id, cycle_id = await seed(repository)
         closest = await insert_article(
-            repository, source_id, cycle_id, "Central bank cuts interest rates", "policy"
+            repository,
+            source_id,
+            cycle_id,
+            "Central bank cuts interest rates",
+            "policy",
         )
         await insert_article(
             repository, source_id, cycle_id, "Volcano closes island airport", "eruption"

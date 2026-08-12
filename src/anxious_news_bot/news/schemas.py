@@ -86,9 +86,9 @@ class StrictSchema(BaseModel):
 
 
 class SemanticMetadataSchema(StrictSchema):
-    representation_id: Annotated[
-        StrictText, StringConstraints(max_length=200)
-    ] = Field(default=None)
+    representation_id: Annotated[StrictText, StringConstraints(max_length=200)] = Field(
+        default=None
+    )
     model: Annotated[StrictText, StringConstraints(max_length=200)] = Field(
         default=None
     )

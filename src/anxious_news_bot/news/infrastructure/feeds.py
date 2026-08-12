@@ -29,7 +29,11 @@ def _published(entry: Any) -> datetime | None:
     if value:
         try:
             result = parsedate_to_datetime(value)
-            return result.replace(tzinfo=UTC) if result.tzinfo is None else result.astimezone(UTC)
+            return (
+                result.replace(tzinfo=UTC)
+                if result.tzinfo is None
+                else result.astimezone(UTC)
+            )
         except (TypeError, ValueError):
             return None
     return None
@@ -61,7 +65,9 @@ class FeedFetcher:
         source: NewsSource,
         conditional_headers: ConditionalHeaders,
     ) -> FetchResult:
-        headers = {"Accept": "application/atom+xml, application/rss+xml, application/xml"}
+        headers = {
+            "Accept": "application/atom+xml, application/rss+xml, application/xml"
+        }
         if conditional_headers.etag:
             headers["If-None-Match"] = conditional_headers.etag
         if conditional_headers.last_modified:
@@ -115,7 +121,10 @@ class FeedFetcher:
             raise SourceRejected(
                 f"source returned HTTP {response.status_code}",
                 code="source_http_rejected",
-                context={"source_id": str(source.id), "status_code": response.status_code},
+                context={
+                    "source_id": str(source.id),
+                    "status_code": response.status_code,
+                },
             )
 
         parsed = feedparser.parse(response.content)
@@ -152,9 +161,7 @@ class FeedFetcher:
             response.headers.get("last-modified"),
         )
 
-    def _retry_delay(
-        self, response: httpx.Response | None, attempt: int
-    ) -> float:
+    def _retry_delay(self, response: httpx.Response | None, attempt: int) -> float:
         if response is not None:
             retry_after = response.headers.get("retry-after")
             if retry_after:

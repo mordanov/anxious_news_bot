@@ -19,7 +19,8 @@ from sqlalchemy import (
     UniqueConstraint,
     text,
 )
-from sqlalchemy.dialects.postgresql import JSONB, UUID as PostgreSQLUUID
+from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import UUID as PostgreSQLUUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 from anxious_news_bot.news.domain import (
@@ -100,13 +101,11 @@ class NewsSource(TimestampMixin, Base):
     last_modified: Mapped[str | None] = mapped_column(Text)
     credential_ref: Mapped[str | None] = mapped_column(String(200))
 
-    source_runs: Mapped[list["SourceRun"]] = relationship(back_populates="source")
-    articles: Mapped[list["NormalizedArticle"]] = relationship(
+    source_runs: Mapped[list[SourceRun]] = relationship(back_populates="source")
+    articles: Mapped[list[NormalizedArticle]] = relationship(
         back_populates="primary_source"
     )
-    records: Mapped[list["SourceArticleRecord"]] = relationship(
-        back_populates="source"
-    )
+    records: Mapped[list[SourceArticleRecord]] = relationship(back_populates="source")
 
 
 class CollectionCycle(Base):
@@ -133,7 +132,9 @@ class CollectionCycle(Base):
         default=CycleStatus.RUNNING,
         server_default=text("'running'"),
     )
-    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    started_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     new_article_count: Mapped[int] = mapped_column(
         Integer, nullable=False, default=0, server_default=text("0")
@@ -146,8 +147,8 @@ class CollectionCycle(Base):
     )
     configuration_version: Mapped[str] = mapped_column(String(100), nullable=False)
 
-    source_runs: Mapped[list["SourceRun"]] = relationship(back_populates="cycle")
-    articles: Mapped[list["NormalizedArticle"]] = relationship(
+    source_runs: Mapped[list[SourceRun]] = relationship(back_populates="cycle")
+    articles: Mapped[list[NormalizedArticle]] = relationship(
         back_populates="created_in_cycle"
     )
 
@@ -192,14 +193,16 @@ class SourceRun(Base):
     rejected_count: Mapped[int] = mapped_column(
         Integer, nullable=False, default=0, server_default=text("0")
     )
-    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    started_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     error_code: Mapped[str | None] = mapped_column(String(100))
     error_context: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
 
     cycle: Mapped[CollectionCycle] = relationship(back_populates="source_runs")
     source: Mapped[NewsSource] = relationship(back_populates="source_runs")
-    records: Mapped[list["SourceArticleRecord"]] = relationship(
+    records: Mapped[list[SourceArticleRecord]] = relationship(
         back_populates="source_run"
     )
 
@@ -234,7 +237,7 @@ class EventGroup(TimestampMixin, Base):
         )
     )
 
-    articles: Mapped[list["NormalizedArticle"]] = relationship(
+    articles: Mapped[list[NormalizedArticle]] = relationship(
         back_populates="event_group",
         foreign_keys="NormalizedArticle.event_group_id",
     )
@@ -278,7 +281,9 @@ class NormalizedArticle(Base):
         ForeignKey("news_sources.id", ondelete="RESTRICT"), nullable=False
     )
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    ingested_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    ingested_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
     language_code: Mapped[str] = mapped_column(String(35), nullable=False)
     normalized_text: Mapped[str] = mapped_column(Text, nullable=False)
     geographic_relevance: Mapped[list[Any]] = mapped_column(
@@ -293,19 +298,17 @@ class NormalizedArticle(Base):
     created_in_cycle_id: Mapped[UUID] = mapped_column(
         ForeignKey("collection_cycles.id", ondelete="RESTRICT"), nullable=False
     )
-    post_processed_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True)
-    )
+    post_processed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     primary_source: Mapped[NewsSource] = relationship(back_populates="articles")
     created_in_cycle: Mapped[CollectionCycle] = relationship(back_populates="articles")
     event_group: Mapped[EventGroup | None] = relationship(
         back_populates="articles", foreign_keys=[event_group_id]
     )
-    source_records: Mapped[list["SourceArticleRecord"]] = relationship(
+    source_records: Mapped[list[SourceArticleRecord]] = relationship(
         back_populates="article"
     )
-    analyses: Mapped[list["ArticleAnalysis"]] = relationship(back_populates="article")
+    analyses: Mapped[list[ArticleAnalysis]] = relationship(back_populates="article")
 
 
 class SourceArticleRecord(Base):
@@ -346,7 +349,9 @@ class SourceArticleRecord(Base):
     original_url: Mapped[str] = mapped_column(Text, nullable=False)
     raw_payload: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     payload_hash: Mapped[str] = mapped_column(String(64), nullable=False)
-    observed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    observed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
     status: Mapped[ProvenanceStatus] = mapped_column(
         _enum(ProvenanceStatus, "provenance_status"), nullable=False
     )
@@ -412,7 +417,9 @@ class DeduplicationDecision(Base):
     )
     normalization_version: Mapped[str] = mapped_column(String(100), nullable=False)
     evidence: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
-    decided_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    decided_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
 
 
 class ArticleAnalysis(Base):
@@ -431,8 +438,7 @@ class ArticleAnalysis(Base):
             name="ck_article_analyses_importance",
         ),
         CheckConstraint(
-            "novelty_score IS NULL OR "
-            "(novelty_score >= 0 AND novelty_score <= 1)",
+            "novelty_score IS NULL OR (novelty_score >= 0 AND novelty_score <= 1)",
             name="ck_article_analyses_novelty",
         ),
         CheckConstraint(

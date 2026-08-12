@@ -15,7 +15,7 @@ from anxious_news_bot.news.domain import (
     NormalizedArticle,
 )
 from anxious_news_bot.news.ports import ArticleEnricher, Clock
-from anxious_news_bot.news.schemas import EnrichmentEnvelopeSchema, SECTION_ADAPTERS
+from anxious_news_bot.news.schemas import SECTION_ADAPTERS, EnrichmentEnvelopeSchema
 
 
 class ArticleEnrichmentService:
@@ -34,9 +34,7 @@ class ArticleEnrichmentService:
         self._analyzer_name = analyzer_name
         self._analyzer_version = analyzer_version
 
-    async def enrich_article(
-        self, article: NormalizedArticle
-    ) -> ArticleAnalysis:
+    async def enrich_article(self, article: NormalizedArticle) -> ArticleAnalysis:
         try:
             raw_result = await self._enricher.enrich(article)
         except asyncio.CancelledError:

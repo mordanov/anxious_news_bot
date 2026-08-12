@@ -40,7 +40,7 @@ jobs:
         run: python -m bandit --quiet --recursive src docker
 
       - name: Audit dependencies
-        run: python -m pip_audit --strict --skip-editable --progress-spinner off
+        run: python -m pip_audit . --strict --progress-spinner off
 
   test:
     name: Tests (Python ${{ matrix.python-version }})

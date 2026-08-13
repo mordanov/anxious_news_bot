@@ -164,6 +164,7 @@ acceptance validation across all stories.
 - [ ] T046 [P] Add digest observability tests for redaction, safe reason codes, occurrence/user hashing, bounded fields, durations, and absence of prompts/article text/provider responses in `tests/unit/digest/test_observability.py` and `tests/unit/test_logging.py`
 - [ ] T047 [P] Document `/count`, disabled-safe schedule provisioning, digest environment settings, migration, retry/unknown semantics, and operating commands in `README.md`, `.env.example`, and `docker-compose.yml`
 - [ ] T048 Run the feature suite, full pytest suite, Ruff checks, migration upgrade/current verification, and quickstart acceptance scenarios; record any required corrections in `src/anxious_news_bot/`, `tests/`, and `specs/004-scheduler-digest/quickstart.md`
+- [ ] T049 After T001-T048 are complete, create the final technical documentation set with architecture and lifecycle diagrams, production/local setup, user workflows, contributor architecture/testing conventions, and an honest implementation retrospective covering what was completed, omitted, done well, limitations, and concrete improvements in `docs/architecture.md`, `docs/setup.md`, `docs/user-guide.md`, `docs/development.md`, and `docs/summary_spec_4.md`, then update the documentation index and feature overview in `README.md`
 
 ---
 
@@ -177,7 +178,8 @@ acceptance validation across all stories.
 - **Phase 4 (US2)**: Depends on Phase 2 and is logically independent of US1.
 - **Phase 5 (US3)**: Depends on Phase 2 and the successful scheduled-delivery
   path from US1 because it hardens that execution with history and retries.
-- **Phase 6 (Polish)**: Depends on all selected story phases.
+- **Phase 6 (Polish)**: Depends on all selected story phases; T049 additionally
+  depends on completion and final validation of T001-T048.
 
 ### User Story Dependency Graph
 
@@ -216,6 +218,7 @@ Setup -> Foundation -> US1 -> US3 -> Polish
 - T040 and T043 can run in parallel; T041 follows the history contract, T042
   follows persistence behavior, and T044/T045 integrate afterward.
 - T046 and T047 can run in parallel before final validation.
+- T049 is intentionally final and cannot run in parallel with any earlier task.
 
 ---
 
@@ -266,6 +269,9 @@ Task T038: Write cross-user isolation tests in tests/integration/digest/test_use
 4. **US3**: History, bounded retries, part resume, ambiguity handling, and
    retention make delivery production-safe.
 5. **Polish**: Operational documentation and full regression evidence complete.
+6. **Final handoff**: Generate architecture, setup, user, development, and
+   retrospective documentation from the validated implementation, then refresh
+   `README.md`.
 
 ### Parallel Team Strategy
 

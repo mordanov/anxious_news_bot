@@ -1,0 +1,101 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://anxious-news-bot.local/schemas/ranking-explanation-v1.json",
+  "title": "Personal Ranking Explanation",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "ranking_run_id",
+    "article_id",
+    "configuration_version",
+    "personal_signed",
+    "personal_factor",
+    "factors",
+    "final_score",
+    "eligible",
+    "selection",
+    "top_contributions"
+  ],
+  "properties": {
+    "schema_version": { "const": "1.0" },
+    "ranking_run_id": { "type": "string", "format": "uuid" },
+    "article_id": { "type": "string", "format": "uuid" },
+    "configuration_version": { "type": "string", "minLength": 1, "maxLength": 100 },
+    "personal_signed": { "$ref": "#/$defs/signed_score" },
+    "personal_factor": { "$ref": "#/$defs/factor" },
+    "factors": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["importance", "freshness", "quality", "novelty"],
+      "properties": {
+        "importance": { "$ref": "#/$defs/factor" },
+        "freshness": { "$ref": "#/$defs/factor" },
+        "quality": { "$ref": "#/$defs/factor" },
+        "novelty": { "$ref": "#/$defs/factor" }
+      }
+    },
+    "final_score": { "$ref": "#/$defs/factor" },
+    "eligible": { "type": "boolean" },
+    "eligibility_reason": { "type": "string", "minLength": 1, "maxLength": 100 },
+    "selection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["selected", "reason", "explicit_protected"],
+      "properties": {
+        "selected": { "type": "boolean" },
+        "position": { "type": ["integer", "null"], "minimum": 1 },
+        "reason": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "explicit_protected": { "type": "boolean" },
+        "diversity_pass": { "type": ["integer", "null"], "minimum": 1 }
+      }
+    },
+    "top_contributions": {
+      "type": "array",
+      "maxItems": 10,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "parameter_id",
+          "parameter_name",
+          "origin",
+          "effective_authority",
+          "weight",
+          "relevance",
+          "contribution"
+        ],
+        "properties": {
+          "parameter_id": { "type": "string", "format": "uuid" },
+          "parameter_name": { "type": "string", "minLength": 1, "maxLength": 160 },
+          "origin": {
+            "enum": ["questionnaire", "explicit", "inference", "system"]
+          },
+          "effective_authority": {
+            "enum": ["questionnaire", "explicit", "inference", "system"]
+          },
+          "weight": {
+            "type": "string",
+            "pattern": "^(?:-?(?:0\\.(?:0[1-9]|[1-9][0-9]))|0\\.00|-?1\\.00)$"
+          },
+          "relevance": { "$ref": "#/$defs/signed_four" },
+          "contribution": { "$ref": "#/$defs/signed_score" }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "factor": {
+      "type": "string",
+      "pattern": "^(?:0\\.[0-9]{8}|1\\.00000000)$"
+    },
+    "signed_score": {
+      "type": "string",
+      "pattern": "^(?:-1\\.00000000|-0\\.[0-9]{8}|0\\.[0-9]{8}|1\\.00000000)$"
+    },
+    "signed_four": {
+      "type": "string",
+      "pattern": "^(?:-1\\.0000|-0\\.[0-9]{4}|0\\.[0-9]{4}|1\\.0000)$"
+    }
+  }
+}

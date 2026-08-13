@@ -3,6 +3,19 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any
 
+_DIMENSION_KEYS = (
+    "topic_politics",
+    "topic_economy",
+    "topic_business",
+    "topic_science",
+    "topic_technology",
+    "topic_health",
+    "topic_climate",
+    "topic_culture",
+    "topic_sports",
+    "geography_scope",
+)
+
 
 def generated_questionnaire() -> dict[str, Any]:
     return {
@@ -10,7 +23,7 @@ def generated_questionnaire() -> dict[str, Any]:
         "questions": [
             {
                 "ordinal": ordinal,
-                "dimension_key": f"dimension_{ordinal}",
+                "dimension_key": _DIMENSION_KEYS[ordinal - 1],
                 "text": f"Which coverage style do you prefer for topic {ordinal}?",
                 "options": [
                     {"ordinal": option, "label": f"Preference {option}"}

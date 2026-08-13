@@ -25,7 +25,7 @@ def test_accepts_exactly_ten_ordered_questions_and_four_options() -> None:
         lambda value: value["questions"][0].update(extra=True),
         lambda value: value["questions"][0].update(ordinal="1"),
         lambda value: value["questions"][0]["options"][1].update(label="Preference 1"),
-        lambda value: value["questions"][1].update(dimension_key="dimension_1"),
+        lambda value: value["questions"][1].update(dimension_key="topic_politics"),
     ],
 )
 def test_rejects_malformed_questionnaires(mutate) -> None:

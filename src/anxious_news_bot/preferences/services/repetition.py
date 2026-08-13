@@ -5,6 +5,7 @@ from difflib import SequenceMatcher
 from anxious_news_bot.preferences.domain import PriorAnswer
 from anxious_news_bot.preferences.errors import QuestionnaireInvalid
 from anxious_news_bot.preferences.schemas import QuestionnaireGenerationSchema
+from anxious_news_bot.preferences.services.dimensions import canonical_dimension_key
 from anxious_news_bot.preferences.services.questionnaire_quality import normalize_text
 
 AMBIGUOUS_ANSWERS = frozenset(
@@ -31,10 +32,15 @@ class SubstantialRepetitionDetector:
         prior: PriorAnswer,
     ) -> bool:
         if (
-            prior.dimension_key == dimension_key
+            canonical_dimension_key(prior.dimension_key)
+            == canonical_dimension_key(dimension_key)
             and normalize_text(prior.selected_option) in AMBIGUOUS_ANSWERS
         ):
             return False
+        if canonical_dimension_key(prior.dimension_key) == canonical_dimension_key(
+            dimension_key
+        ):
+            return True
         return (
             SequenceMatcher(
                 None,

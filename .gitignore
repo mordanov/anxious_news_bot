@@ -47,6 +47,11 @@ out/
 # Logs and runtime files
 *.log
 *.pid
+*.tmp
+*.swp
+
+# Editors
+.vscode/
 
 # Operating system files
 .DS_Store

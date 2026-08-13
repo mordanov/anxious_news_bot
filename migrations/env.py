@@ -14,6 +14,9 @@ from anxious_news_bot.news.infrastructure import models as news_models  # noqa: 
 from anxious_news_bot.preferences.infrastructure import (
     models as preference_models,  # noqa: F401
 )
+from anxious_news_bot.ranking.infrastructure import (
+    models as ranking_models,  # noqa: F401
+)
 
 config = context.config
 

@@ -1,25 +1,30 @@
 from __future__ import annotations
 
-import json
 from collections.abc import Mapping, Sequence
+from copy import deepcopy
 from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
 import httpx
-from tenacity import (
-    AsyncRetrying,
-    retry_if_exception_type,
-    stop_after_attempt,
-    wait_exponential,
-)
 
-from anxious_news_bot.preferences.domain import ProfileSnapshot, QuestionnaireContext
+from anxious_news_bot.infrastructure.structured_model import StructuredModelTransport
+from anxious_news_bot.preferences.domain import (
+    ProfileSnapshot,
+    QuestionnaireContext,
+    normalize_language_code,
+)
 from anxious_news_bot.preferences.errors import (
     InterpretationFailed,
     QuestionnaireGenerationFailed,
 )
 from anxious_news_bot.preferences.schemas import CreateChangeSchema
+from anxious_news_bot.preferences.services.dimensions import (
+    available_dimensions,
+    consolidated_dimension_context,
+)
+
+EXPLICIT_INTERPRETATION_VERSION = "explicit-preference-v1"
 
 
 class StructuredPreferenceModelAdapter:
@@ -33,14 +38,18 @@ class StructuredPreferenceModelAdapter:
         timeout_seconds: float = 30.0,
         retry_attempts: int = 2,
         max_response_bytes: int = 262_144,
+        explicit_history_limit: int = 20,
     ) -> None:
-        self._client = client
-        self._base_url = base_url.rstrip("/")
-        self._api_key = api_key
-        self._model = model
-        self._timeout_seconds = timeout_seconds
-        self._retry_attempts = retry_attempts
-        self._max_response_bytes = max_response_bytes
+        self._transport = StructuredModelTransport(
+            client,
+            base_url=base_url,
+            api_key=api_key,
+            model=model,
+            timeout_seconds=timeout_seconds,
+            retry_attempts=retry_attempts,
+            max_response_bytes=max_response_bytes,
+        )
+        self._explicit_history_limit = explicit_history_limit
 
     async def generate(self, context: QuestionnaireContext) -> Mapping[str, Any]:
         if not self._configured:
@@ -48,8 +57,16 @@ class StructuredPreferenceModelAdapter:
         active = tuple(
             parameter for parameter in context.profile.parameters if parameter.active
         )
+        language = normalize_language_code(context.language_code)
+        language_names = {"ru": "Русский", "en": "English", "es": "Español"}
+        dimensions = available_dimensions(
+            context.prior_answers,
+            context.dimension_context,
+        )
+        dimension_context = consolidated_dimension_context(context.dimension_context)
         prompt = {
-            "language_code": context.language_code,
+            "language_code": language.value,
+            "output_language": language_names[language.value],
             "profile": self._profile(context.profile),
             "adaptive_context": {
                 "strong_preference_keys": [
@@ -63,9 +80,18 @@ class StructuredPreferenceModelAdapter:
                     if abs(parameter.weight) <= Decimal("0.20")
                 ],
                 "explored_dimensions": sorted(
-                    {item.dimension_key for item in context.prior_answers}
+                    {item.dimension_key for item in dimension_context}
+                    | {item.dimension_key for item in context.prior_answers}
                 ),
+                "dimension_exposure_counts": {
+                    item.dimension_key: item.exposure_count
+                    for item in dimension_context
+                },
             },
+            "available_dimensions": [
+                {"key": dimension.key, "guidance": dimension.guidance}
+                for dimension in dimensions
+            ],
             "prior_answers": [
                 {
                     "question": item.question,
@@ -77,6 +103,10 @@ class StructuredPreferenceModelAdapter:
             "instructions": (
                 "Generate exactly 10 short, concrete, neutral, single-dimensional "
                 "news-preference questions with exactly four distinct options. "
+                f"Write every question and option only in {language_names[language.value]}. "
+                "Use exactly 10 distinct keys from available_dimensions; copy each "
+                "key exactly into dimension_key. Do not revisit an explored semantic "
+                "dimension under a new name. "
                 "Prefer unexplored dimensions, strong interests, and ambiguity "
                 "clarification. Avoid substantial repetition and disguised yes/no."
             ),
@@ -85,7 +115,9 @@ class StructuredPreferenceModelAdapter:
             return await self._request(
                 "questionnaire_generation",
                 prompt,
-                self._questionnaire_schema(),
+                self._questionnaire_schema(
+                    tuple(dimension.key for dimension in dimensions)
+                ),
             )
         except Exception as exc:
             if isinstance(exc, QuestionnaireGenerationFailed):
@@ -120,6 +152,48 @@ class StructuredPreferenceModelAdapter:
                 "preference_changes",
                 prompt,
                 self._changes_schema(),
+            )
+        except Exception as exc:
+            if isinstance(exc, InterpretationFailed):
+                raise
+            raise InterpretationFailed("model request failed") from exc
+
+    async def interpret(
+        self,
+        request_id: UUID,
+        statement: str,
+        profile_snapshot: ProfileSnapshot,
+        relevant_history: Sequence[Mapping[str, Any]],
+    ) -> Mapping[str, Any]:
+        if not self._configured:
+            raise InterpretationFailed("preference model is not configured")
+        prompt = {
+            "request_id": str(request_id),
+            "schema_version": "1.0",
+            "interpretation_version": EXPLICIT_INTERPRETATION_VERSION,
+            "statement": statement,
+            "profile": self._profile(profile_snapshot),
+            "relevant_history": [
+                dict(item) for item in relevant_history[: self._explicit_history_limit]
+            ],
+            "instructions": (
+                "Interpret one explicit news-preference statement as an incremental "
+                "change set. Keep specific intent specific. Preserve every named "
+                "place, person, organization, and topic verbatim in the descriptive "
+                "fields. Encode named entities in semantic_key using a stable ASCII "
+                "transliteration; for example, Russian 'Киров' becomes "
+                "'kirov_city_news'. Reuse equivalent active "
+                "or inactive parameters instead of proposing duplicates. A narrower "
+                "distinct concept may create a new explicit preference. Do not "
+                "broaden, weaken, deactivate, or relabel unrelated explicit "
+                "preferences. Use canonical two-decimal weights and concise reasons."
+            ),
+        }
+        try:
+            return await self._request(
+                "explicit_preference_changes",
+                prompt,
+                self._explicit_changes_schema(),
             )
         except Exception as exc:
             if isinstance(exc, InterpretationFailed):
@@ -164,7 +238,7 @@ class StructuredPreferenceModelAdapter:
 
     @property
     def _configured(self) -> bool:
-        return bool(self._base_url and self._api_key and self._model)
+        return self._transport.configured
 
     async def _request(
         self,
@@ -172,50 +246,7 @@ class StructuredPreferenceModelAdapter:
         prompt: Mapping[str, Any],
         schema: Mapping[str, Any],
     ) -> Mapping[str, Any]:
-        retrying = AsyncRetrying(
-            stop=stop_after_attempt(self._retry_attempts),
-            wait=wait_exponential(min=0.2, max=2),
-            retry=retry_if_exception_type((httpx.ConnectError, httpx.TimeoutException)),
-            reraise=True,
-        )
-        async for attempt in retrying:
-            with attempt:
-                response = await self._client.post(
-                    f"{self._base_url}/chat/completions",
-                    timeout=self._timeout_seconds,
-                    headers={"Authorization": f"Bearer {self._api_key}"},
-                    json={
-                        "model": self._model,
-                        "messages": [
-                            {
-                                "role": "user",
-                                "content": json.dumps(
-                                    prompt,
-                                    ensure_ascii=False,
-                                    separators=(",", ":"),
-                                ),
-                            }
-                        ],
-                        "response_format": {
-                            "type": "json_schema",
-                            "json_schema": {
-                                "name": name,
-                                "strict": True,
-                                "schema": schema,
-                            },
-                        },
-                    },
-                )
-                response.raise_for_status()
-                if len(response.content) > self._max_response_bytes:
-                    raise ValueError("model response exceeds configured size")
-                body = response.json()
-                content = body["choices"][0]["message"]["content"]
-                value = json.loads(content) if isinstance(content, str) else content
-                if not isinstance(value, dict):
-                    raise ValueError("model response must be an object")
-                return value
-        raise RuntimeError("unreachable")
+        return await self._transport.request(name, prompt, schema)
 
     @staticmethod
     def _profile(profile: ProfileSnapshot) -> Mapping[str, Any]:
@@ -237,13 +268,26 @@ class StructuredPreferenceModelAdapter:
         }
 
     @staticmethod
-    def _questionnaire_schema() -> Mapping[str, Any]:
+    def _questionnaire_schema(
+        allowed_dimension_keys: tuple[str, ...] | None = None,
+    ) -> Mapping[str, Any]:
         from anxious_news_bot.preferences.schemas import QuestionnaireGenerationSchema
 
-        return QuestionnaireGenerationSchema.model_json_schema()
+        schema = deepcopy(QuestionnaireGenerationSchema.model_json_schema())
+        if allowed_dimension_keys is not None:
+            schema["$defs"]["GeneratedQuestionSchema"]["properties"]["dimension_key"][
+                "enum"
+            ] = list(allowed_dimension_keys)
+        return schema
 
     @staticmethod
     def _changes_schema() -> Mapping[str, Any]:
         from anxious_news_bot.preferences.schemas import PreferenceChangesSchema
 
         return PreferenceChangesSchema.model_json_schema()
+
+    @staticmethod
+    def _explicit_changes_schema() -> Mapping[str, Any]:
+        from anxious_news_bot.preferences.schemas import ExplicitPreferenceChangesSchema
+
+        return ExplicitPreferenceChangesSchema.model_json_schema()

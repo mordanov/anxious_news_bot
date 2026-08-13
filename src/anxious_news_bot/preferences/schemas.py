@@ -16,6 +16,8 @@ from pydantic import (
     model_validator,
 )
 
+from anxious_news_bot.preferences.domain import PreferenceOrigin
+
 
 def _tuple(value: Any) -> Any:
     return tuple(value) if isinstance(value, list) else value
@@ -183,9 +185,8 @@ PreferenceChangeSchema = Annotated[
 ]
 
 
-class PreferenceChangesSchema(StrictSchema):
+class BasePreferenceChangesSchema(StrictSchema):
     schema_version: Literal["1.0"]
-    questionnaire_id: UUID
     base_profile_revision: Annotated[int, Field(strict=True, ge=0)]
     changes: Annotated[
         tuple[PreferenceChangeSchema, ...],
@@ -194,7 +195,7 @@ class PreferenceChangesSchema(StrictSchema):
     ]
 
     @model_validator(mode="after")
-    def unique_targets(self) -> PreferenceChangesSchema:
+    def unique_targets(self) -> BasePreferenceChangesSchema:
         targets = [
             change.parameter_id
             for change in self.changes
@@ -212,6 +213,30 @@ class PreferenceChangesSchema(StrictSchema):
         return self
 
 
+class PreferenceChangesSchema(BasePreferenceChangesSchema):
+    questionnaire_id: UUID
+
+    @property
+    def source(self) -> PreferenceOrigin:
+        return PreferenceOrigin.QUESTIONNAIRE
+
+    @property
+    def source_request_id(self) -> UUID:
+        return self.questionnaire_id
+
+
+class ExplicitPreferenceChangesSchema(BasePreferenceChangesSchema):
+    request_id: UUID
+
+    @property
+    def source(self) -> PreferenceOrigin:
+        return PreferenceOrigin.EXPLICIT
+
+    @property
+    def source_request_id(self) -> UUID:
+        return self.request_id
+
+
 class EquivalenceSchema(StrictSchema):
     schema_version: Literal["1.0"]
     outcome: Literal["equivalent", "distinct"]
@@ -221,6 +246,8 @@ class EquivalenceSchema(StrictSchema):
 
 
 CHANGE_ADAPTER = TypeAdapter(PreferenceChangeSchema)
+QUESTIONNAIRE_CHANGES_ADAPTER = TypeAdapter(PreferenceChangesSchema)
+EXPLICIT_CHANGES_ADAPTER = TypeAdapter(ExplicitPreferenceChangesSchema)
 YES_NO_WORDS = re.compile(
     r"^(yes|no|да|нет|rather yes|rather no|скорее да|скорее нет)$", re.IGNORECASE
 )

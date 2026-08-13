@@ -51,6 +51,23 @@ class RankingStatus(StrEnum):
     STALE = "stale"
 
 
+@dataclass(frozen=True, slots=True)
+class DeliveryArticle:
+    article_id: UUID
+    title: str
+    summary: str | None
+    canonical_url: str
+    source_name: str
+    published_at: datetime
+
+
+@dataclass(frozen=True, slots=True)
+class RankedNewsItem:
+    article: DeliveryArticle
+    position: int
+    score: Decimal
+
+
 class PersonalState(StrEnum):
     COMPLETE = "complete"
     NO_ACTIVE_PARAMETERS = "no_active_parameters"

@@ -9,6 +9,7 @@ from anxious_news_bot.preferences.domain import ProfileSnapshot
 from anxious_news_bot.ranking.domain import (
     ArticleEvaluation,
     ArticleEvaluationIdentity,
+    DeliveryArticle,
     RankingArticleSnapshot,
     RankingConfiguration,
     RankingIdentity,
@@ -34,6 +35,23 @@ class ArticlePreferenceEvaluator(Protocol):
 
 @runtime_checkable
 class RankingRepository(Protocol):
+    async def resolve_user_id(self, telegram_user_id: int) -> UUID | None: ...
+
+    async def prepare_delivery_candidates(
+        self,
+        *,
+        limit: int,
+        ranking_at: datetime,
+        freshness_horizon_seconds: int,
+    ) -> tuple[UUID, ...]: ...
+
+    async def load_delivery_articles(
+        self,
+        article_ids: Sequence[UUID],
+    ) -> tuple[DeliveryArticle, ...]: ...
+
+    async def has_active_nonzero_preferences(self, user_id: UUID) -> bool: ...
+
     async def claim_evaluation(
         self,
         identity: ArticleEvaluationIdentity,

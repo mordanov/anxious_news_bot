@@ -46,6 +46,7 @@ from anxious_news_bot.preferences.services.apply_changes import (
 from anxious_news_bot.preferences.services.duplicates import (
     PreferenceDuplicateDetector,
 )
+from anxious_news_bot.preferences.services.language import UserLanguageService
 from anxious_news_bot.preferences.services.questionnaire_quality import (
     DeterministicQuestionnaireQualityValidator,
 )
@@ -80,9 +81,16 @@ from anxious_news_bot.ranking.services.evaluate import ArticleEvaluationService
 from anxious_news_bot.ranking.services.explain import (
     DeterministicRankingExplainer,
 )
+from anxious_news_bot.ranking.services.news import PersonalNewsService
 from anxious_news_bot.ranking.services.rank import PersonalRankingService
 from anxious_news_bot.ranking.services.retention import RankingRetentionService
 from anxious_news_bot.ranking.services.score import DeterministicRankingScorer
+from anxious_news_bot.telegram.language import (
+    CALLBACK_PREFIX as LANGUAGE_CALLBACK_PREFIX,
+)
+from anxious_news_bot.telegram.language import LanguageTelegramAdapter
+from anxious_news_bot.telegram.news import NewsTelegramAdapter
+from anxious_news_bot.telegram.news_translation import StructuredNewsTitleTranslator
 from anxious_news_bot.telegram.specify import SpecifyTelegramAdapter
 from anxious_news_bot.telegram.tune import CALLBACK_PREFIX, TuneTelegramAdapter
 
@@ -200,7 +208,10 @@ def build_application(settings: Settings) -> Application:
         repetition_detector=SubstantialRepetitionDetector(
             threshold=settings.preferences_repetition_threshold
         ),
+        generation_attempts=settings.preferences_questionnaire_generation_attempts,
+        interpretation_attempts=settings.preferences_interpretation_attempts,
     )
+    language_service = UserLanguageService(preference_repository, preference_clock)
     specify_service = ExplicitPreferenceService(
         preference_repository,
         preference_model,
@@ -210,7 +221,8 @@ def build_application(settings: Settings) -> Application:
         stale_retry_limit=settings.preferences_explicit_stale_retry_limit,
         max_statement_length=settings.preferences_explicit_request_max_length,
     )
-    tune_adapter = TuneTelegramAdapter(tuning_service)
+    tune_adapter = TuneTelegramAdapter(tuning_service, language_service)
+    language_adapter = LanguageTelegramAdapter(language_service)
     specify_adapter = SpecifyTelegramAdapter(
         specify_service,
         max_text_length=settings.preferences_explicit_request_max_length,
@@ -251,6 +263,29 @@ def build_application(settings: Settings) -> Application:
         ranking_configuration_provider,
         ranking_scorer,
         RankingClock(),
+    )
+    personal_news_service = PersonalNewsService(
+        ranking_repository,
+        article_evaluation_service,
+        personal_ranking_service,
+        ranking_configuration_provider,
+        RankingClock(),
+        candidate_limit=settings.news_command_candidate_limit,
+        evaluation_concurrency=settings.news_command_evaluation_concurrency,
+    )
+    news_title_translator = StructuredNewsTitleTranslator(
+        client,
+        base_url=settings.ranking_model_base_url,
+        api_key=settings.ranking_model_api_key,
+        model=settings.ranking_model_name,
+        timeout_seconds=settings.ranking_model_timeout_seconds,
+        retry_attempts=settings.ranking_model_retry_attempts,
+        max_response_bytes=settings.ranking_model_max_response_bytes,
+    )
+    news_adapter = NewsTelegramAdapter(
+        personal_news_service,
+        language_service,
+        news_title_translator,
     )
     ranking_retention_service = RankingRetentionService(
         ranking_repository,
@@ -313,8 +348,16 @@ def build_application(settings: Settings) -> Application:
         .build()
     )
     application.add_handler(CommandHandler("start", start))
+    application.add_handler(CommandHandler("language", language_adapter.command))
+    application.add_handler(CommandHandler("news", news_adapter.command))
     application.add_handler(CommandHandler("tune", tune_adapter.command))
     application.add_handler(CommandHandler("specify", specify_adapter.command))
+    application.add_handler(
+        CallbackQueryHandler(
+            language_adapter.callback,
+            pattern=rf"^{LANGUAGE_CALLBACK_PREFIX}",
+        )
+    )
     application.add_handler(
         CallbackQueryHandler(
             tune_adapter.callback,
@@ -329,6 +372,7 @@ def build_application(settings: Settings) -> Application:
     application.bot_data["ranking_scorer"] = ranking_scorer
     application.bot_data["ranking_explainer"] = ranking_explainer
     application.bot_data["personal_ranking_service"] = personal_ranking_service
+    application.bot_data["personal_news_service"] = personal_news_service
     application.bot_data["ranking_repository"] = ranking_repository
     application.bot_data["ranking_evaluator"] = ranking_evaluator
     return application

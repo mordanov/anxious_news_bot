@@ -52,7 +52,23 @@ question has four opaque callback options. The profile is updated atomically onl
 after all answers pass strict local validation. Configure an OpenAI-compatible
 structured-output endpoint with `PREFERENCES_MODEL_BASE_URL`,
 `PREFERENCES_MODEL_API_KEY`, and `PREFERENCES_MODEL_NAME`; all three are required
-together.
+together. New questionnaires select from a controlled semantic-dimension catalog
+and record a durable per-user exposure count for every generated dimension.
+Unseen dimensions are exhausted first; afterward, least-used and least-recently
+used dimensions rotate in, so renamed questions and retention cleanup cannot
+bypass the history check.
+
+Send `/news` to evaluate a bounded pool of recent articles against the current
+user's active preferences and return the top 10 after deterministic scoring,
+quality eligibility, and diversity selection. Articles without generic analysis
+receive a conservative deterministic baseline before personal evaluation. The
+selected headlines are translated in one structured LLM request into the language
+chosen with `/language`; article URLs and source metadata remain unchanged.
+
+Send `/language` to choose `Русский`, `English`, or `Español` for the current
+user. The selection persists across restarts. Changing it closes any unfinished
+questionnaire so the next `/tune` uses the model to generate every question and
+option in the newly selected language.
 
 Send `/specify` to add or refine one explicit preference in plain language. The
 same provider family is used for strict change proposals and bounded duplicate
@@ -97,6 +113,8 @@ Operational settings include:
 | `NEWS_FETCH_TIMEOUT_SECONDS` | `20` | Per-request timeout |
 | `NEWS_FETCH_RETRY_ATTEMPTS` | `3` | Bounded fetch attempts |
 | `NEWS_MAX_CONCURRENCY` | `5` | Maximum simultaneous source fetches |
+| `NEWS_COMMAND_CANDIDATE_LIMIT` | `30` | Recent articles considered by `/news` |
+| `NEWS_COMMAND_EVALUATION_CONCURRENCY` | `5` | Parallel personal evaluations for `/news` |
 | `NEWS_RAW_PAYLOAD_RETENTION_DAYS` | `7` | Raw provenance retention policy |
 | `NEWS_NEAR_DUPLICATE_TITLE_THRESHOLD` | `0.85` | Duplicate title threshold |
 | `NEWS_NEAR_DUPLICATE_CONTENT_THRESHOLD` | `0.80` | Duplicate body threshold |

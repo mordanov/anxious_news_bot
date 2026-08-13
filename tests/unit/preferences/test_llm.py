@@ -19,6 +19,16 @@ async def test_structured_adapter_returns_untrusted_mapping() -> None:
         assert request.headers["authorization"] == "Bearer secret"
         body = json.loads(request.content)
         assert body["response_format"]["type"] == "json_schema"
+        prompt = json.loads(body["messages"][0]["content"])
+        assert prompt["language_code"] == "en"
+        assert prompt["output_language"] == "English"
+        assert "only in English" in prompt["instructions"]
+        allowed_dimensions = {item["key"] for item in prompt["available_dimensions"]}
+        dimension_schema = body["response_format"]["json_schema"]["schema"]["$defs"][
+            "GeneratedQuestionSchema"
+        ]["properties"]["dimension_key"]
+        assert set(dimension_schema["enum"]) == allowed_dimensions
+        assert len(allowed_dimensions) > 10
         return httpx.Response(
             200,
             json={

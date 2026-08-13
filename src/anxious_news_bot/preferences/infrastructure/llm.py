@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
+from copy import deepcopy
 from decimal import Decimal
 from typing import Any
 from uuid import UUID
@@ -8,12 +9,20 @@ from uuid import UUID
 import httpx
 
 from anxious_news_bot.infrastructure.structured_model import StructuredModelTransport
-from anxious_news_bot.preferences.domain import ProfileSnapshot, QuestionnaireContext
+from anxious_news_bot.preferences.domain import (
+    ProfileSnapshot,
+    QuestionnaireContext,
+    normalize_language_code,
+)
 from anxious_news_bot.preferences.errors import (
     InterpretationFailed,
     QuestionnaireGenerationFailed,
 )
 from anxious_news_bot.preferences.schemas import CreateChangeSchema
+from anxious_news_bot.preferences.services.dimensions import (
+    available_dimensions,
+    consolidated_dimension_context,
+)
 
 EXPLICIT_INTERPRETATION_VERSION = "explicit-preference-v1"
 
@@ -48,8 +57,16 @@ class StructuredPreferenceModelAdapter:
         active = tuple(
             parameter for parameter in context.profile.parameters if parameter.active
         )
+        language = normalize_language_code(context.language_code)
+        language_names = {"ru": "Русский", "en": "English", "es": "Español"}
+        dimensions = available_dimensions(
+            context.prior_answers,
+            context.dimension_context,
+        )
+        dimension_context = consolidated_dimension_context(context.dimension_context)
         prompt = {
-            "language_code": context.language_code,
+            "language_code": language.value,
+            "output_language": language_names[language.value],
             "profile": self._profile(context.profile),
             "adaptive_context": {
                 "strong_preference_keys": [
@@ -63,9 +80,18 @@ class StructuredPreferenceModelAdapter:
                     if abs(parameter.weight) <= Decimal("0.20")
                 ],
                 "explored_dimensions": sorted(
-                    {item.dimension_key for item in context.prior_answers}
+                    {item.dimension_key for item in dimension_context}
+                    | {item.dimension_key for item in context.prior_answers}
                 ),
+                "dimension_exposure_counts": {
+                    item.dimension_key: item.exposure_count
+                    for item in dimension_context
+                },
             },
+            "available_dimensions": [
+                {"key": dimension.key, "guidance": dimension.guidance}
+                for dimension in dimensions
+            ],
             "prior_answers": [
                 {
                     "question": item.question,
@@ -77,6 +103,10 @@ class StructuredPreferenceModelAdapter:
             "instructions": (
                 "Generate exactly 10 short, concrete, neutral, single-dimensional "
                 "news-preference questions with exactly four distinct options. "
+                f"Write every question and option only in {language_names[language.value]}. "
+                "Use exactly 10 distinct keys from available_dimensions; copy each "
+                "key exactly into dimension_key. Do not revisit an explored semantic "
+                "dimension under a new name. "
                 "Prefer unexplored dimensions, strong interests, and ambiguity "
                 "clarification. Avoid substantial repetition and disguised yes/no."
             ),
@@ -85,7 +115,9 @@ class StructuredPreferenceModelAdapter:
             return await self._request(
                 "questionnaire_generation",
                 prompt,
-                self._questionnaire_schema(),
+                self._questionnaire_schema(
+                    tuple(dimension.key for dimension in dimensions)
+                ),
             )
         except Exception as exc:
             if isinstance(exc, QuestionnaireGenerationFailed):
@@ -146,7 +178,11 @@ class StructuredPreferenceModelAdapter:
             ],
             "instructions": (
                 "Interpret one explicit news-preference statement as an incremental "
-                "change set. Keep specific intent specific. Reuse equivalent active "
+                "change set. Keep specific intent specific. Preserve every named "
+                "place, person, organization, and topic verbatim in the descriptive "
+                "fields. Encode named entities in semantic_key using a stable ASCII "
+                "transliteration; for example, Russian 'Киров' becomes "
+                "'kirov_city_news'. Reuse equivalent active "
                 "or inactive parameters instead of proposing duplicates. A narrower "
                 "distinct concept may create a new explicit preference. Do not "
                 "broaden, weaken, deactivate, or relabel unrelated explicit "
@@ -232,10 +268,17 @@ class StructuredPreferenceModelAdapter:
         }
 
     @staticmethod
-    def _questionnaire_schema() -> Mapping[str, Any]:
+    def _questionnaire_schema(
+        allowed_dimension_keys: tuple[str, ...] | None = None,
+    ) -> Mapping[str, Any]:
         from anxious_news_bot.preferences.schemas import QuestionnaireGenerationSchema
 
-        return QuestionnaireGenerationSchema.model_json_schema()
+        schema = deepcopy(QuestionnaireGenerationSchema.model_json_schema())
+        if allowed_dimension_keys is not None:
+            schema["$defs"]["GeneratedQuestionSchema"]["properties"]["dimension_key"][
+                "enum"
+            ] = list(allowed_dimension_keys)
+        return schema
 
     @staticmethod
     def _changes_schema() -> Mapping[str, Any]:

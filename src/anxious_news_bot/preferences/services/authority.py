@@ -57,6 +57,64 @@ _GENERIC_TOKENS = frozenset(
     }
 )
 _TOKEN_PATTERN = re.compile(r"[\w']+")
+_CYRILLIC_TRANSLITERATION = {
+    "а": "a",
+    "б": "b",
+    "в": "v",
+    "г": "g",
+    "д": "d",
+    "е": "e",
+    "ё": "yo",
+    "ж": "zh",
+    "з": "z",
+    "и": "i",
+    "й": "y",
+    "к": "k",
+    "л": "l",
+    "м": "m",
+    "н": "n",
+    "о": "o",
+    "п": "p",
+    "р": "r",
+    "с": "s",
+    "т": "t",
+    "у": "u",
+    "ф": "f",
+    "х": "kh",
+    "ц": "ts",
+    "ч": "ch",
+    "ш": "sh",
+    "щ": "shch",
+    "ъ": "",
+    "ы": "y",
+    "ь": "",
+    "э": "e",
+    "ю": "yu",
+    "я": "ya",
+    "і": "i",
+    "ї": "yi",
+    "є": "ye",
+    "ґ": "g",
+}
+
+
+def _transliterate_cyrillic(value: str) -> str:
+    return "".join(
+        _CYRILLIC_TRANSLITERATION.get(character, character) for character in value
+    )
+
+
+def _add_semantic_token(tokens: set[str], token: str) -> None:
+    if len(token) < 3 or token in _GENERIC_TOKENS:
+        return
+    tokens.add(token)
+    transliterated = _transliterate_cyrillic(token)
+    if (
+        transliterated != token
+        and len(transliterated) >= 3
+        and transliterated not in _GENERIC_TOKENS
+    ):
+        tokens.add(transliterated)
 
 
 def derive_effective_authority(
@@ -74,11 +132,7 @@ def semantic_tokens(*values: str) -> frozenset[str]:
     for value in values:
         normalized = unicodedata.normalize("NFKC", value).casefold()
         for token in _TOKEN_PATTERN.findall(normalized):
-            if len(token) < 3:
-                continue
-            if token in _GENERIC_TOKENS:
-                continue
-            tokens.add(token)
+            _add_semantic_token(tokens, token)
     return frozenset(tokens)
 
 

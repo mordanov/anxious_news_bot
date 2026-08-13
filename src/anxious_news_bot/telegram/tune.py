@@ -5,28 +5,71 @@ import logging
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import ContextTypes
 
-from anxious_news_bot.preferences.domain import TuneState, TuneStateKind
+from anxious_news_bot.preferences.domain import (
+    SupportedLanguage,
+    TuneState,
+    TuneStateKind,
+)
 from anxious_news_bot.preferences.errors import AnswerRejected
+from anxious_news_bot.preferences.services.language import UserLanguageService
 from anxious_news_bot.preferences.services.tune import PreferenceTuningService
 
 LOGGER = logging.getLogger(__name__)
 CALLBACK_PREFIX = "t:"
+MESSAGES = {
+    SupportedLanguage.RUSSIAN: {
+        "question": "Вопрос",
+        "invalid": "Этот вариант ответа недействителен.",
+        "stale": "Этот вариант устарел. Отправьте /tune, чтобы продолжить.",
+        "generating": "Создаю анкету предпочтений...",
+        "processing": "Обновляю ваши предпочтения...",
+        "completed": "Ваши новостные предпочтения обновлены.",
+        "failed": "Настройка предпочтений не удалась. Отправьте /tune ещё раз.",
+    },
+    SupportedLanguage.ENGLISH: {
+        "question": "Question",
+        "invalid": "This preference option is invalid.",
+        "stale": "This option is stale. Send /tune to resume your questionnaire.",
+        "generating": "Creating your preference questionnaire...",
+        "processing": "Updating your preferences...",
+        "completed": "Your news preferences have been updated.",
+        "failed": "Preference tuning failed. Send /tune to try again.",
+    },
+    SupportedLanguage.SPANISH: {
+        "question": "Pregunta",
+        "invalid": "Esta opción de preferencia no es válida.",
+        "stale": "Esta opción ha caducado. Envía /tune para continuar.",
+        "generating": "Creando tu cuestionario de preferencias...",
+        "processing": "Actualizando tus preferencias...",
+        "completed": "Tus preferencias de noticias se han actualizado.",
+        "failed": "No se pudieron ajustar las preferencias. Envía /tune de nuevo.",
+    },
+}
 
 
 class TuneTelegramAdapter:
-    def __init__(self, service: PreferenceTuningService) -> None:
+    def __init__(
+        self,
+        service: PreferenceTuningService,
+        language_service: UserLanguageService,
+    ) -> None:
         self._service = service
+        self._language_service = language_service
 
     async def command(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         del context
         if update.effective_user is None or update.message is None:
             LOGGER.warning("tune_command_missing_user_or_message")
             return
-        state = await self._service.start_or_resume(
+        language = await self._language_service.get(
             update.effective_user.id,
             update.effective_user.language_code,
         )
-        await self._render_message(update.message.reply_text, state)
+        state = await self._service.start_or_resume(
+            update.effective_user.id,
+            language.value,
+        )
+        await self._render_message(update.message.reply_text, state, language)
 
     async def callback(
         self, update: Update, context: ContextTypes.DEFAULT_TYPE
@@ -44,21 +87,27 @@ class TuneTelegramAdapter:
             or not isinstance(data, str)
             or not data.startswith(CALLBACK_PREFIX)
         ):
-            await query.edit_message_text("This preference option is invalid.")
+            await query.edit_message_text(
+                MESSAGES[SupportedLanguage.ENGLISH]["invalid"]
+            )
             return
+        language = await self._language_service.get(user.id, user.language_code)
         try:
             state = await self._service.answer(
                 user.id, data.removeprefix(CALLBACK_PREFIX)
             )
         except AnswerRejected:
-            await query.edit_message_text(
-                "This option is stale. Send /tune to resume your questionnaire."
-            )
+            await query.edit_message_text(MESSAGES[language]["stale"])
             return
-        await self._render_message(query.edit_message_text, state)
+        await self._render_message(query.edit_message_text, state, language)
 
     @staticmethod
-    async def _render_message(reply, state: TuneState) -> None:
+    async def _render_message(
+        reply,
+        state: TuneState,
+        language: SupportedLanguage = SupportedLanguage.ENGLISH,
+    ) -> None:
+        messages = MESSAGES[language]
         if state.kind is TuneStateKind.QUESTION:
             if state.ordinal is None or state.question is None:
                 raise RuntimeError("question state is incomplete")
@@ -74,16 +123,14 @@ class TuneTelegramAdapter:
                 ]
             )
             await reply(
-                f"Question {state.ordinal}/10\n\n{state.question}",
+                f"{messages['question']} {state.ordinal}/10\n\n{state.question}",
                 reply_markup=keyboard,
             )
             return
-        messages = {
-            TuneStateKind.GENERATING: "Creating your preference questionnaire...",
-            TuneStateKind.PROCESSING: "Updating your preferences...",
-            TuneStateKind.COMPLETED: "Your news preferences have been updated.",
-            TuneStateKind.FAILED: (
-                state.message or "Preference tuning failed. Send /tune to try again."
-            ),
+        state_messages = {
+            TuneStateKind.GENERATING: messages["generating"],
+            TuneStateKind.PROCESSING: messages["processing"],
+            TuneStateKind.COMPLETED: messages["completed"],
+            TuneStateKind.FAILED: messages["failed"],
         }
-        await reply(messages[state.kind])
+        await reply(state_messages[state.kind])

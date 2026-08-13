@@ -19,6 +19,7 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    func,
 )
 from sqlalchemy import (
     text as sql_text,
@@ -176,6 +177,39 @@ class Questionnaire(TimestampMixin, Base):
     )
     update_batch: Mapped[PreferenceUpdateBatch | None] = relationship(
         back_populates="questionnaire"
+    )
+
+
+class QuestionDimensionContext(Base):
+    __tablename__ = "preference_question_contexts"
+    __table_args__ = (
+        CheckConstraint(
+            "exposure_count > 0",
+            name="ck_preference_question_contexts_exposure_count",
+        ),
+        Index(
+            "ix_preference_question_contexts_rotation",
+            "user_id",
+            "exposure_count",
+            "last_exposed_at",
+        ),
+    )
+
+    user_id: Mapped[UUID] = mapped_column(
+        ForeignKey("application_users.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    dimension_key: Mapped[str] = mapped_column(String(100), primary_key=True)
+    exposure_count: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=1,
+        server_default=sql_text("1"),
+    )
+    last_exposed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
     )
 
 

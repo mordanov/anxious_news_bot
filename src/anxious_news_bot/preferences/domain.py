@@ -14,6 +14,21 @@ class PreferenceOrigin(StrEnum):
     SYSTEM = "system"
 
 
+class SupportedLanguage(StrEnum):
+    RUSSIAN = "ru"
+    ENGLISH = "en"
+    SPANISH = "es"
+
+
+def normalize_language_code(value: str | None) -> SupportedLanguage:
+    primary = (value or "").strip().lower().replace("_", "-").split("-", 1)[0]
+    if primary == SupportedLanguage.RUSSIAN:
+        return SupportedLanguage.RUSSIAN
+    if primary == SupportedLanguage.SPANISH:
+        return SupportedLanguage.SPANISH
+    return SupportedLanguage.ENGLISH
+
+
 class QuestionnaireStatus(StrEnum):
     GENERATING = "generating"
     ANSWERING = "answering"
@@ -105,10 +120,18 @@ class PriorAnswer:
 
 
 @dataclass(frozen=True, slots=True)
+class QuestionDimensionContext:
+    dimension_key: str
+    exposure_count: int
+    last_exposed_at: datetime
+
+
+@dataclass(frozen=True, slots=True)
 class QuestionnaireContext:
     profile: ProfileSnapshot
     language_code: str | None
     prior_answers: tuple[PriorAnswer, ...] = ()
+    dimension_context: tuple[QuestionDimensionContext, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)

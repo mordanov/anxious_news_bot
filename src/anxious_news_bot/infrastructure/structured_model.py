@@ -13,6 +13,23 @@ from tenacity import (
 )
 
 
+def _openai_compatible_schema(value: Any) -> Any:
+    if isinstance(value, list):
+        return [_openai_compatible_schema(item) for item in value]
+    if not isinstance(value, Mapping):
+        return value
+
+    normalized = {
+        ("anyOf" if key == "oneOf" else key): _openai_compatible_schema(item)
+        for key, item in value.items()
+        if key not in {"default", "discriminator"}
+    }
+    properties = normalized.get("properties")
+    if isinstance(properties, dict):
+        normalized["required"] = list(properties)
+    return normalized
+
+
 class StructuredModelTransport:
     def __init__(
         self,
@@ -74,7 +91,7 @@ class StructuredModelTransport:
                             "json_schema": {
                                 "name": name,
                                 "strict": True,
-                                "schema": schema,
+                                "schema": _openai_compatible_schema(schema),
                             },
                         },
                     },

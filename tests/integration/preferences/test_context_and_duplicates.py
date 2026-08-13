@@ -21,6 +21,8 @@ async def test_history_context_is_bounded_and_isolated_per_user(
         "Local News",
     )
     assert len(context.prior_answers) == 10
+    assert len(context.dimension_context) == 10
+    assert all(item.exposure_count == 1 for item in context.dimension_context)
     assert context.profile.parameters[0].semantic_key == "local_news"
     assert other_context.prior_answers == ()
     assert other_context.profile.parameters == ()

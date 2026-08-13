@@ -37,10 +37,22 @@ async def test_explicit_interpretation_request_includes_bounded_context_and_sche
         assert prompt["request_id"] == str(request_id)
         assert prompt["interpretation_version"] == "explicit-preference-v1"
         assert prompt["statement"] == "More Kirov city news"
+        assert "Preserve every named" in prompt["instructions"]
+        assert "'Киров'" in prompt["instructions"]
         assert len(prompt["profile"]["parameters"]) == 1
         assert len(prompt["relevant_history"]) == 20
         schema = body["response_format"]["json_schema"]["schema"]
         assert "request_id" in schema["required"]
+        change_items = schema["properties"]["changes"]["items"]
+        assert "oneOf" not in change_items
+        assert "discriminator" not in change_items
+        assert len(change_items["anyOf"]) == 5
+        refine_schema = schema["$defs"]["RefineChangeSchema"]
+        assert refine_schema["required"] == list(refine_schema["properties"])
+        assert all(
+            "default" not in property_schema
+            for property_schema in refine_schema["properties"].values()
+        )
         return httpx.Response(
             200,
             json={

@@ -20,3 +20,17 @@ def test_ambiguity_clarification_is_allowed() -> None:
     detector = SubstantialRepetitionDetector()
     prior = PriorAnswer("How local should news be?", "Unsure", "local_news")
     assert not detector.is_repetition("How local should news be?", "local_news", prior)
+
+
+def test_renamed_semantic_dimension_is_repetition() -> None:
+    detector = SubstantialRepetitionDetector()
+    prior = PriorAnswer(
+        "How often should updates arrive?",
+        "Once a day",
+        "news_update_urgency",
+    )
+    assert detector.is_repetition(
+        "Choose your preferred alert speed.",
+        "breaking_news",
+        prior,
+    )

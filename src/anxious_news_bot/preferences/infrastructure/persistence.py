@@ -8,7 +8,7 @@ from decimal import Decimal
 from typing import Any
 from uuid import UUID, uuid4
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -26,10 +26,15 @@ from anxious_news_bot.preferences.domain import (
     RetentionResult,
     SpecifyState,
     SpecifyStateKind,
+    SupportedLanguage,
     TuneOption,
     TuneState,
     TuneStateKind,
     UpdateBatchStatus,
+    normalize_language_code,
+)
+from anxious_news_bot.preferences.domain import (
+    QuestionDimensionContext as DomainQuestionDimensionContext,
 )
 from anxious_news_bot.preferences.errors import (
     AnswerRejected,
@@ -48,6 +53,7 @@ from anxious_news_bot.preferences.infrastructure.models import (
     PreferenceEvidence,
     PreferenceProfile,
     PreferenceUpdateBatch,
+    QuestionDimensionContext,
     Questionnaire,
     QuestionnaireAnswer,
     QuestionnaireQuestion,
@@ -106,6 +112,48 @@ class SQLAlchemyPreferenceRepository:
         )
         self._change_validator = DeterministicPreferenceChangeValidator()
 
+    async def get_or_create_language(
+        self,
+        telegram_user_id: int,
+        telegram_language_code: str | None,
+    ) -> SupportedLanguage:
+        async with self._database.session() as session:
+            user, _ = await self._ensure_user_profile(
+                session,
+                telegram_user_id=telegram_user_id,
+                language_code=telegram_language_code,
+            )
+            return normalize_language_code(user.language_code)
+
+    async def set_language(
+        self,
+        telegram_user_id: int,
+        language: SupportedLanguage,
+        changed_at: datetime,
+    ) -> None:
+        async with self._database.session() as session:
+            user, _ = await self._ensure_user_profile(
+                session,
+                telegram_user_id=telegram_user_id,
+                language_code=language.value,
+            )
+            if normalize_language_code(user.language_code) is language:
+                return
+            user.language_code = language.value
+            await session.execute(
+                update(Questionnaire)
+                .where(
+                    Questionnaire.user_id == user.id,
+                    Questionnaire.status.in_(ACTIVE_STATUSES),
+                )
+                .values(
+                    status=QuestionnaireStatus.FAILED,
+                    error_code="language_changed",
+                    completed_at=changed_at,
+                    updated_at=changed_at,
+                )
+            )
+
     async def start_or_resume(
         self, telegram_user_id: int, language_code: str | None
     ) -> tuple[QuestionnaireContext, TuneState]:
@@ -128,6 +176,7 @@ class SQLAlchemyPreferenceRepository:
                 profile=profile,
                 language_code=user.language_code,
                 prior_answers=await self._prior_answers(session, user.id),
+                dimension_context=await self._dimension_context(session, user.id),
             )
             if questionnaire is not None:
                 return context, await self._state(session, questionnaire)
@@ -195,6 +244,29 @@ class SQLAlchemyPreferenceRepository:
                         )
                     )
                 session.add(question_entity)
+            exposed_at = func.now()
+            for question in questionnaire.questions:
+                await session.execute(
+                    insert(QuestionDimensionContext)
+                    .values(
+                        user_id=entity.user_id,
+                        dimension_key=question.dimension_key,
+                        exposure_count=1,
+                        last_exposed_at=exposed_at,
+                    )
+                    .on_conflict_do_update(
+                        index_elements=(
+                            QuestionDimensionContext.user_id,
+                            QuestionDimensionContext.dimension_key,
+                        ),
+                        set_={
+                            "exposure_count": (
+                                QuestionDimensionContext.exposure_count + 1
+                            ),
+                            "last_exposed_at": exposed_at,
+                        },
+                    )
+                )
             entity.status = QuestionnaireStatus.ANSWERING
             await session.flush()
             return await self._state(session, entity)
@@ -444,6 +516,34 @@ class SQLAlchemyPreferenceRepository:
                 questionnaire_id=questionnaire_id,
                 message="Preference tuning failed. Start /tune to try again.",
             )
+
+    async def complete_questionnaire_no_change(
+        self,
+        questionnaire_id: UUID,
+        completed_at: datetime,
+    ) -> TuneState:
+        async with self._database.session() as session:
+            questionnaire = await session.scalar(
+                select(Questionnaire)
+                .where(Questionnaire.id == questionnaire_id)
+                .with_for_update()
+            )
+            if questionnaire is None:
+                raise PreferenceProposalInvalid("unknown questionnaire")
+            if questionnaire.status is QuestionnaireStatus.APPLIED:
+                return TuneState(TuneStateKind.COMPLETED, questionnaire_id)
+            if questionnaire.status not in (
+                QuestionnaireStatus.ANSWERS_COMPLETE,
+                QuestionnaireStatus.INTERPRETING,
+                QuestionnaireStatus.APPLYING,
+            ):
+                raise PreferenceProposalInvalid(
+                    "questionnaire is not ready for completion"
+                )
+            questionnaire.status = QuestionnaireStatus.APPLIED
+            questionnaire.completed_at = completed_at
+            questionnaire.updated_at = completed_at
+            return TuneState(TuneStateKind.COMPLETED, questionnaire_id)
 
     async def claim_explicit_request(
         self,
@@ -1037,6 +1137,28 @@ class SQLAlchemyPreferenceRepository:
         ).all()
         return tuple(PriorAnswer(*row) for row in rows)
 
+    @staticmethod
+    async def _dimension_context(
+        session: AsyncSession,
+        user_id: UUID,
+    ) -> tuple[DomainQuestionDimensionContext, ...]:
+        rows = (
+            await session.execute(
+                select(
+                    QuestionDimensionContext.dimension_key,
+                    QuestionDimensionContext.exposure_count,
+                    QuestionDimensionContext.last_exposed_at,
+                )
+                .where(QuestionDimensionContext.user_id == user_id)
+                .order_by(
+                    QuestionDimensionContext.exposure_count,
+                    QuestionDimensionContext.last_exposed_at,
+                    QuestionDimensionContext.dimension_key,
+                )
+            )
+        ).all()
+        return tuple(DomainQuestionDimensionContext(*row) for row in rows)
+
     async def _explicit_history(
         self,
         session: AsyncSession,
@@ -1085,21 +1207,23 @@ class SQLAlchemyPreferenceRepository:
     ) -> tuple[ApplicationUser, PreferenceProfile]:
         user_insert = insert(ApplicationUser).values(
             telegram_user_id=telegram_user_id,
-            language_code=language_code,
+            language_code=normalize_language_code(language_code).value,
         )
         user = (
             await session.execute(
-                user_insert.on_conflict_do_update(
+                user_insert.on_conflict_do_nothing(
                     index_elements=[ApplicationUser.telegram_user_id],
-                    set_={
-                        "language_code": func.coalesce(
-                            user_insert.excluded.language_code,
-                            ApplicationUser.language_code,
-                        )
-                    },
                 ).returning(ApplicationUser)
             )
-        ).scalar_one()
+        ).scalar_one_or_none()
+        if user is None:
+            user = await session.scalar(
+                select(ApplicationUser).where(
+                    ApplicationUser.telegram_user_id == telegram_user_id
+                )
+            )
+        if user is None:
+            raise RuntimeError("application user claim failed")
         await session.execute(
             insert(PreferenceProfile)
             .values(user_id=user.id, revision=0)
@@ -1240,6 +1364,14 @@ class SQLAlchemyPreferenceRepository:
             "prior_answers": [
                 (item.question, item.selected_option, item.dimension_key)
                 for item in context.prior_answers
+            ],
+            "dimension_context": [
+                (
+                    item.dimension_key,
+                    item.exposure_count,
+                    item.last_exposed_at.isoformat(),
+                )
+                for item in context.dimension_context
             ],
         }
         return SQLAlchemyPreferenceRepository._state_hash(payload)

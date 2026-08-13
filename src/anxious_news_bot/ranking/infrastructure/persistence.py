@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 from collections import defaultdict
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Any
@@ -19,6 +19,7 @@ from anxious_news_bot.news.domain import AnalysisStatus, DecisionOutcome
 from anxious_news_bot.news.infrastructure.models import (
     ArticleAnalysis,
     DeduplicationDecision,
+    NewsSource,
     NormalizedArticle,
 )
 from anxious_news_bot.preferences.domain import (
@@ -27,6 +28,7 @@ from anxious_news_bot.preferences.domain import (
     ProfileSnapshot,
 )
 from anxious_news_bot.preferences.infrastructure.models import (
+    ApplicationUser,
     ExplicitPreferenceRequest,
     PreferenceEvidence,
     PreferenceProfile,
@@ -40,6 +42,7 @@ from anxious_news_bot.ranking.domain import (
     ArticleEvaluationIdentity,
     ArticleParameterRelevance,
     ContributionSnapshot,
+    DeliveryArticle,
     EligibilityReason,
     EvaluationAttemptStatus,
     EvaluationStatus,
@@ -77,6 +80,116 @@ from anxious_news_bot.ranking.services.rank import candidate_snapshot_hash
 class SQLAlchemyRankingRepository:
     def __init__(self, database: Database) -> None:
         self._database = database
+
+    async def resolve_user_id(self, telegram_user_id: int) -> UUID | None:
+        async with self._database.session() as session:
+            return await session.scalar(
+                select(ApplicationUser.id).where(
+                    ApplicationUser.telegram_user_id == telegram_user_id
+                )
+            )
+
+    async def has_active_nonzero_preferences(self, user_id: UUID) -> bool:
+        async with self._database.session() as session:
+            return bool(
+                await session.scalar(
+                    select(PreferenceParameterModel.id)
+                    .where(
+                        PreferenceParameterModel.user_id == user_id,
+                        PreferenceParameterModel.active.is_(True),
+                        PreferenceParameterModel.weight != Decimal("0.00"),
+                    )
+                    .limit(1)
+                )
+            )
+
+    async def prepare_delivery_candidates(
+        self,
+        *,
+        limit: int,
+        ranking_at: datetime,
+        freshness_horizon_seconds: int,
+    ) -> tuple[UUID, ...]:
+        cutoff = ranking_at - timedelta(seconds=freshness_horizon_seconds)
+        async with self._database.session() as session:
+            rows = (
+                await session.execute(
+                    select(NormalizedArticle, NewsSource.quality_score)
+                    .join(
+                        NewsSource,
+                        NewsSource.id == NormalizedArticle.primary_source_id,
+                    )
+                    .where(
+                        NormalizedArticle.published_at.is_not(None),
+                        NormalizedArticle.published_at >= cutoff,
+                        NormalizedArticle.published_at <= ranking_at,
+                    )
+                    .order_by(
+                        NormalizedArticle.published_at.desc(),
+                        NormalizedArticle.id,
+                    )
+                    .limit(limit)
+                )
+            ).all()
+            article_ids = tuple(article.id for article, _ in rows)
+            analyses = await self._latest_analyses_by_article(session, article_ids)
+            for article, source_quality in rows:
+                existing = analyses.get(article.id)
+                if existing is not None and existing.status is AnalysisStatus.COMPLETE:
+                    continue
+                topic = self._baseline_topic(article.topic_metadata)
+                await session.execute(
+                    insert(ArticleAnalysis)
+                    .values(
+                        article_id=article.id,
+                        status=AnalysisStatus.COMPLETE,
+                        schema_version="1.0",
+                        analyzer_name="deterministic-baseline",
+                        analyzer_version="1.0",
+                        topics=[topic] if topic else [],
+                        importance_score=Decimal("0.5000"),
+                        novelty_score=Decimal("0.5000"),
+                        source_quality_score=Decimal(source_quality)
+                        if source_quality is not None
+                        else Decimal("0.5000"),
+                        semantic_metadata={"basis": "delivery_baseline"},
+                        created_at=ranking_at,
+                    )
+                    .on_conflict_do_nothing(constraint="uq_article_analyses_version")
+                )
+            return article_ids
+
+    async def load_delivery_articles(
+        self,
+        article_ids: Sequence[UUID],
+    ) -> tuple[DeliveryArticle, ...]:
+        ids = tuple(article_ids)
+        if not ids:
+            return ()
+        async with self._database.session() as session:
+            rows = (
+                await session.execute(
+                    select(NormalizedArticle, NewsSource.name)
+                    .join(
+                        NewsSource,
+                        NewsSource.id == NormalizedArticle.primary_source_id,
+                    )
+                    .where(NormalizedArticle.id.in_(ids))
+                )
+            ).all()
+        by_id = {
+            article.id: DeliveryArticle(
+                article_id=article.id,
+                title=article.title,
+                summary=article.summary,
+                canonical_url=article.canonical_url,
+                source_name=source_name,
+                published_at=article.published_at,
+            )
+            for article, source_name in rows
+            if article.published_at is not None
+        }
+        return tuple(by_id[article_id] for article_id in ids if article_id in by_id)
 
     async def claim_evaluation(
         self,
@@ -1068,7 +1181,10 @@ class SQLAlchemyRankingRepository:
         rows = tuple(
             await session.scalars(
                 select(ArticleAnalysis)
-                .where(ArticleAnalysis.article_id.in_(article_ids))
+                .where(
+                    ArticleAnalysis.article_id.in_(article_ids),
+                    ArticleAnalysis.status == AnalysisStatus.COMPLETE,
+                )
                 .order_by(
                     ArticleAnalysis.article_id,
                     ArticleAnalysis.created_at.desc(),
@@ -1766,6 +1882,17 @@ class SQLAlchemyRankingRepository:
             .order_by(ArticleAnalysis.created_at.desc(), ArticleAnalysis.id.desc())
             .limit(1)
         )
+
+    @staticmethod
+    def _baseline_topic(metadata: list[Any]) -> str | None:
+        for item in metadata:
+            if isinstance(item, str) and item.strip():
+                return item.strip()[:100]
+            if isinstance(item, Mapping):
+                value = item.get("key") or item.get("name") or item.get("topic")
+                if isinstance(value, str) and value.strip():
+                    return value.strip()[:100]
+        return None
 
     async def _latest_duplicate_outcome(
         self,

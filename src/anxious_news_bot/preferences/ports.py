@@ -10,6 +10,7 @@ from anxious_news_bot.preferences.domain import (
     ProfileSnapshot,
     QuestionnaireContext,
     SpecifyState,
+    SupportedLanguage,
     TuneState,
 )
 from anxious_news_bot.preferences.schemas import (
@@ -76,6 +77,17 @@ class TokenFactory(Protocol):
 
 @runtime_checkable
 class PreferenceRepositoryPort(Protocol):
+    async def get_or_create_language(
+        self, telegram_user_id: int, telegram_language_code: str | None
+    ) -> SupportedLanguage: ...
+
+    async def set_language(
+        self,
+        telegram_user_id: int,
+        language: SupportedLanguage,
+        changed_at: datetime,
+    ) -> None: ...
+
     async def start_or_resume(
         self, telegram_user_id: int, language_code: str | None
     ) -> tuple[QuestionnaireContext, TuneState]: ...
@@ -103,6 +115,12 @@ class PreferenceRepositoryPort(Protocol):
         questionnaire_id: UUID,
         proposal: PreferenceChangesSchema,
         applied_at: datetime,
+    ) -> TuneState: ...
+
+    async def complete_questionnaire_no_change(
+        self,
+        questionnaire_id: UUID,
+        completed_at: datetime,
     ) -> TuneState: ...
 
     async def fail(

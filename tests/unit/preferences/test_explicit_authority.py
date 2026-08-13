@@ -162,6 +162,37 @@ def test_specific_explicit_create_is_allowed_when_no_equivalent_exists() -> None
     assert validated.changes[0].semantic_key == "kirov_city_news"
 
 
+def test_russian_statement_matches_latin_transliteration() -> None:
+    existing = _parameter(
+        semantic_key="climate_policy",
+        name="Climate policy",
+        description="Reporting about climate policy.",
+        instructions="Prefer climate policy reporting.",
+    )
+    request_id = uuid4()
+    proposal = _proposal(
+        request_id,
+        {
+            "action": "create",
+            "semantic_key": "kirov_city_news",
+            "name": "Kirov city news",
+            "description": "Reporting about the city of Kirov.",
+            "evaluation_instructions": "Prefer reporting relevant to Kirov.",
+            "target_weight": "0.80",
+            "reason": "The user requested Kirov city news.",
+        },
+    )
+
+    validated = DeterministicPreferenceChangeValidator().validate(
+        proposal,
+        _profile(existing),
+        request_id,
+        statement="Новости города Киров",
+    )
+
+    assert validated.changes[0].semantic_key == "kirov_city_news"
+
+
 @pytest.mark.parametrize(
     "origin",
     [

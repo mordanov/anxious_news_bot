@@ -107,6 +107,8 @@ class Settings:
     news_fetch_timeout_seconds: float = 20.0
     news_fetch_retry_attempts: int = 3
     news_max_concurrency: int = 5
+    news_command_candidate_limit: int = 30
+    news_command_evaluation_concurrency: int = 5
     news_url_policy_version: str = "1.0"
     news_tracking_parameters: tuple[str, ...] = (
         "fbclid",
@@ -137,6 +139,8 @@ class Settings:
     preferences_model_timeout_seconds: float = 30.0
     preferences_model_retry_attempts: int = 2
     preferences_model_max_response_bytes: int = 262_144
+    preferences_questionnaire_generation_attempts: int = 3
+    preferences_interpretation_attempts: int = 2
     preferences_history_question_limit: int = 50
     preferences_explicit_request_max_length: int = 1000
     preferences_explicit_history_limit: int = 20
@@ -219,6 +223,17 @@ class Settings:
             ),
             news_fetch_retry_attempts=_integer("NEWS_FETCH_RETRY_ATTEMPTS", 3),
             news_max_concurrency=_integer("NEWS_MAX_CONCURRENCY", 5),
+            news_command_candidate_limit=_integer(
+                "NEWS_COMMAND_CANDIDATE_LIMIT",
+                30,
+                minimum=10,
+                maximum=500,
+            ),
+            news_command_evaluation_concurrency=_integer(
+                "NEWS_COMMAND_EVALUATION_CONCURRENCY",
+                5,
+                maximum=50,
+            ),
             news_url_policy_version=_text("NEWS_URL_POLICY_VERSION", "1.0"),
             news_tracking_parameters=tracking_parameters,
             news_raw_payload_retention_days=_integer(
@@ -257,6 +272,16 @@ class Settings:
             ),
             preferences_model_max_response_bytes=_integer(
                 "PREFERENCES_MODEL_MAX_RESPONSE_BYTES", 262_144
+            ),
+            preferences_questionnaire_generation_attempts=_integer(
+                "PREFERENCES_QUESTIONNAIRE_GENERATION_ATTEMPTS",
+                3,
+                maximum=5,
+            ),
+            preferences_interpretation_attempts=_integer(
+                "PREFERENCES_INTERPRETATION_ATTEMPTS",
+                2,
+                maximum=5,
             ),
             preferences_history_question_limit=_integer(
                 "PREFERENCES_HISTORY_QUESTION_LIMIT", 50

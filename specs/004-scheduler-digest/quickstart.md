@@ -19,6 +19,8 @@ Existing configuration remains required. Add validated digest settings:
 ```dotenv
 DIGEST_SCAN_INTERVAL_SECONDS=60
 DIGEST_CLAIM_BATCH_SIZE=100
+DIGEST_MAX_CLAIMS_PER_TICK=1000
+DIGEST_CLAIM_TIME_BUDGET_SECONDS=30
 DIGEST_USER_CONCURRENCY=5
 DIGEST_DEFAULT_COUNT=10
 DIGEST_DEFAULT_LOCAL_TIME=09:00
@@ -27,7 +29,10 @@ DIGEST_CANDIDATE_LIMIT=100
 DIGEST_MAX_ATTEMPTS=3
 DIGEST_RETRY_BASE_SECONDS=60
 DIGEST_RETRY_MAX_SECONDS=900
+DIGEST_MATERIAL_UPDATE_POLICY_VERSION=1.0
 DIGEST_MATERIAL_UPDATE_NOVELTY_THRESHOLD=0.7000
+DIGEST_MATERIAL_UPDATE_MAX_CONTENT_SIMILARITY=0.60000
+DIGEST_MATERIAL_UPDATE_MIN_TEXT_CHARS=200
 DIGEST_HISTORY_RETENTION_DAYS=30
 DIGEST_CONTENT_MAX_INPUT_CHARS=2000
 DIGEST_RENDERER_VERSION=1.0
@@ -39,9 +44,13 @@ Validation rules:
 - timezone must be a real IANA timezone;
 - local time is `HH:MM`;
 - candidate limit is at least 20 and at most the ranking maximum of 500;
-- concurrency, batch, interval, and attempts are positive and bounded;
+- concurrency, batch, per-tick maximum, claim-time budget, interval, and
+  attempts are positive and bounded;
+- per-tick maximum is not below the claim batch size;
 - retry maximum is not below retry base;
 - material-update threshold is `0.0000..1.0000`;
+- material-update policy version is non-empty, content similarity uses exactly
+  five decimal places in `0.00000..1.00000`, and minimum text length is positive;
 - history retention cannot be shorter than the configured ranking freshness
   horizon in whole days.
 
@@ -59,6 +68,11 @@ disabled-safe configuration for every existing application user:
 - local time: 09:00
 - timezone: UTC
 - next due: null
+
+After migration, the shared user provisioner atomically creates the application
+user, preference profile, and the same disabled-safe digest configuration for
+every new user, regardless of whether their first command is `/language`,
+`/tune`, `/specify`, or `/count`.
 
 ## Run
 
@@ -148,6 +162,10 @@ interface in production; this is only the scoped operational acceptance path.
 4. Add a later article in the event group with complete analysis novelty at or
    above the configured threshold.
 5. Verify the new development remains eligible and can be ranked.
+6. Repeat with conservative baseline novelty, sufficiently different normalized
+   content, and no duplicate/review pair decision.
+7. Verify versioned `content_delta` evidence is persisted and the article remains
+   eligible; then add a review decision and verify it is excluded.
 
 ### Structured content
 
@@ -199,4 +217,3 @@ Structured digest logs include only bounded operational fields:
 Logs exclude Telegram tokens, provider URLs containing credentials, prompts,
 answers, model output, article text, rendered messages, and provider response
 bodies.
-

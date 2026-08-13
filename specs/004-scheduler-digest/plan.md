@@ -33,11 +33,13 @@ database claims safe for overlapping scheduler ticks or future additional
 processes  
 **Project Type**: Python modular-monolith Telegram application with internal
 application services and adapter boundaries  
-**Performance Goals**: Claim 99% of due occurrences within five minutes; scan
-10,000 configurations through indexed bounded batches; process at least five
-users concurrently without cross-user cancellation; keep due scans below one
-second for a normally indexed 10,000-user data set; cap each digest at 20 items
-and each ranking candidate pool at 100 by default  
+**Performance Goals**: For 10,000 registered configurations and a burst of up to
+1,000 due users, durably claim at least 99% within five minutes by draining
+multiple indexed batches per tick up to a configured 1,000-claim/30-second work
+budget; process at least five claimed users concurrently without cross-user
+cancellation; keep an individual 100-row claim query below one second; cap each
+digest at 20 items and each ranking candidate pool at 100 by default
+
 **Constraints**: User count is 5..20; default count is 10; persisted IANA
 timezones and local daily schedule; one execution per user/local occurrence;
 bounded attempts and user concurrency; no duplicate retry after an ambiguous
@@ -73,10 +75,11 @@ brokers, and on-demand `/news` history changes are out of scope.
   acknowledgements explain every execution and make retries resume persisted
   state rather than recompute it.
 - **Data and configuration - PASS**: Migration `005` adds digest tables,
-  constraints, indexes, and safe disabled defaults. Scan intervals, batches,
-  concurrency, default schedule/timezone/count, candidate limit, retry policy,
-  material-update threshold, content limits, and history retention are validated
-  settings.
+  constraints, indexes, and safe disabled defaults. Shared user provisioning
+  atomically creates preference and digest state. Scan intervals, claim batch and
+  per-tick budgets, concurrency, default schedule/timezone/count, candidate
+  limit, retry policy, material-update novelty/content-delta thresholds and
+  policy version, content limits, and history retention are validated settings.
 - **Reliability and tests - PASS**: Clock, repository, personal-news selection,
   composer, renderer/delivery, and trigger ports have fakes. Tests cover count
   boundaries, due/DST rules, claims, user isolation, shortages, history,
@@ -114,6 +117,8 @@ src/anxious_news_bot/
 ├── app.py
 ├── config.py
 ├── logging.py
+├── infrastructure/
+│   └── users.py
 ├── digest/
 │   ├── __init__.py
 │   ├── domain.py
@@ -126,6 +131,8 @@ src/anxious_news_bot/
 │   │   ├── content.py
 │   │   ├── execute.py
 │   │   ├── history.py
+│   │   ├── material_updates.py
+│   │   ├── retention.py
 │   │   └── schedule.py
 │   └── infrastructure/
 │       ├── llm.py
@@ -137,6 +144,8 @@ src/anxious_news_bot/
 │   ├── ports.py
 │   ├── infrastructure/persistence.py
 │   └── services/news.py
+├── preferences/
+│   └── infrastructure/persistence.py
 └── telegram/
     ├── count.py
     └── digest.py
@@ -157,7 +166,15 @@ ineligible candidate IDs before existing evaluation, scoring, and diversity.
 Digest composition belongs to `digest`, not Telegram, and persists structured
 localized items once. Telegram renders those items into bounded delivery parts
 and reports acknowledgements through a delivery port. JobQueue calls only the
-application-level due-cycle service.
+application-level due-cycle service. Extract the existing application-user/profile
+claim into shared `infrastructure/users.py`; both preferences and digest
+repositories call it, and it atomically inserts the disabled-safe digest
+configuration so users created after migration cannot lack scheduler state.
+Material-update filtering first uses accepted novelty, then a versioned
+deterministic producer compares persisted normalized content for later articles
+in the same event and stores the decision. Existing duplicate/review evidence
+vetoes that fallback, so baseline analysis does not make the update path
+unreachable or permit source copies.
 
 ## Phase 0: Research Outcome
 
@@ -182,4 +199,3 @@ Research decisions and rejected alternatives are recorded in
 ## Complexity Tracking
 
 No constitution violations require justification.
-

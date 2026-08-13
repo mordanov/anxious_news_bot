@@ -60,11 +60,33 @@ record_failure(execution_id, failure, completed_at)
 Rules:
 
 - `set_count` rejects values outside `5..20` before persistence and ensures the
-  shared application user/profile through the existing identity owner.
+  shared application user/profile/digest configuration through the sole
+  infrastructure provisioner.
 - `claim_due` returns only enabled rows with `next_due_at <= now`.
 - Claiming and advancing each configuration is atomic.
 - Repeated claims for the same occurrence return no second execution.
 - Success/failure summary fields use monotonic timestamp comparisons.
+- “Failure summary” means the latest terminally failed execution; recovered
+  transient attempts remain only in attempt history.
+
+## Shared ApplicationUserProvisioner
+
+```text
+ensure(session, telegram_user_id, language_hint, digest_defaults)
+  -> ProvisionedUser
+
+ProvisionedUser:
+  application_user
+  preference_profile
+  digest_configuration
+```
+
+Rules:
+
+- Upserts all three rows in one caller-owned transaction.
+- Uses disabled-safe digest defaults and never enables delivery implicitly.
+- Is the sole creation path used by preference and digest repositories.
+- Is concurrency-safe and self-heals a missing profile or configuration.
 
 ## DigestExecutionRepository
 
@@ -132,10 +154,50 @@ Rules:
 
 - Same normalized article is always excluded after confirmed or uncertain
   history.
-- Same event group is excluded unless a later complete analysis meets the
-  configured material-update threshold.
+- Same event group is excluded unless a later article has either accepted
+  novelty at the configured threshold or persisted material-update evidence from
+  the versioned deterministic producer below.
+- Duplicate/review evidence and insufficient/short normalized text force
+  `unchanged`.
 - Decisions are deterministic and contain no free-form model reason.
 - The filter does not reorder eligible candidates.
+
+## MaterialUpdateEvidenceProducer
+
+```text
+evaluate(delivery_history, candidate_article, candidate_analysis, policy)
+  -> MaterialUpdateEvidence
+
+MaterialUpdateEvidence:
+  delivery_history_id
+  candidate_article_id
+  candidate_analysis_id
+  event_group_id
+  policy_version
+  basis: accepted_novelty | content_delta | insufficient_evidence
+  outcome: material_update | unchanged
+  prior_text_hash
+  candidate_text_hash
+  content_similarity?
+  novelty_score?
+  threshold_snapshot
+```
+
+Rules:
+
+- Different articles, same event group, and later candidate publication are
+  mandatory; otherwise outcome is unchanged.
+- Accepted non-baseline or baseline analysis may qualify only when its novelty
+  meets the configured threshold.
+- Otherwise canonical normalized texts must each meet the configured minimum
+  length and their deterministic similarity must be at or below the configured
+  material-change maximum.
+- A persisted near-duplicate decision with `duplicate` or `review` outcome for
+  the pair vetoes content-delta qualification.
+- The repository inserts or loads evidence under the unique pair/policy key
+  before the history filter returns eligibility.
+- Hashes and threshold snapshots make the decision auditable without copying
+  article text into digest evidence or logs.
 
 ## Personal News Selection Extension
 
@@ -249,6 +311,11 @@ Cycle rules:
 
 - One user's exception is captured and never cancels another execution.
 - Concurrency and batch size are bounded configuration.
+- A tick drains multiple claim batches until no due rows remain, the configured
+  maximum claims per tick is reached, or the configured claim-time budget
+  expires.
+- The performance clock stops when the unique execution is durably claimed;
+  ranking/model/delivery latency is measured separately.
 - Retry claims use the same execution and skip completed preparation phases.
 - Attempts stop at the configured maximum.
 
@@ -264,4 +331,3 @@ tick(context)
 - The callback invokes due and retry cycles only.
 - It contains no timezone, ranking, history, or retry classification logic.
 - `start` and `stop` are idempotent.
-

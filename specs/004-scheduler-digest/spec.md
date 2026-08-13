@@ -109,9 +109,10 @@ delivery for the execution and suppression of unchanged prior articles.
 
 ### Functional Requirements
 
-- **FR-001**: The system MUST persist one digest configuration per user,
-  including enabled state, digest count, schedule, timezone, last successful
-  execution, and last failure.
+- **FR-001**: The system MUST atomically persist one disabled-safe digest
+  configuration whenever an application user is created, including enabled
+  state, digest count, schedule, timezone, last successful execution, and last
+  terminally failed execution.
 - **FR-002**: Digest count MUST be an integer from 5 through 20, inclusive.
 - **FR-003**: The `/count <value>` command MUST persist a valid digest count for
   the current user and confirm the new value in that user's chosen language.
@@ -146,8 +147,11 @@ delivery for the execution and suppression of unchanged prior articles.
 - **FR-016**: Previously delivered, materially unchanged articles MUST be
   excluded unless an explicit repetition policy or direct user request permits
   reuse.
-- **FR-017**: A previously delivered story MAY be selected when the available
-  evidence identifies a material update or new development.
+- **FR-017**: A previously delivered story MAY be selected when a newer article
+  has deterministic persisted evidence of a material update or new development,
+  based on either accepted novelty analysis or a versioned same-event normalized
+  content comparison that demonstrates material change and is not contradicted
+  by duplicate or review evidence.
 - **FR-018**: Every scheduled digest execution MUST have a unique, stable
   execution identifier and a distinguishable state for scheduled, retrying,
   completed, and failed processing.
@@ -157,7 +161,9 @@ delivery for the execution and suppression of unchanged prior articles.
   item count, completion or failure state, timestamps, attempt history, and a
   safe failure classification when applicable.
 - **FR-021**: The system MUST record the user's last successful execution and
-  last failure without allowing an older attempt to overwrite newer status.
+  last terminally failed execution without allowing an older execution to
+  overwrite newer status; transient attempts that later recover MUST remain in
+  attempt history but MUST NOT replace the terminal-failure summary.
 - **FR-022**: Transient failures MUST be eligible for bounded retry; permanent
   failures MUST be recorded and excluded from automatic retry.
 - **FR-023**: An execution with no suitable articles MUST complete without
@@ -224,8 +230,11 @@ delivery for the execution and suppression of unchanged prior articles.
   outcome of any other due user's execution in 100% of isolation tests.
 - **SC-005**: Replaying or retrying the same execution any number of times
   results in no more than one completed delivery in 100% of idempotency tests.
-- **SC-006**: At least 99% of normally operating due executions begin within
-  five minutes of their configured local schedule.
+- **SC-006**: With 10,000 registered digest configurations and up to 1,000 users
+  becoming due in the same scan window, at least 99% of those due occurrences
+  are durably claimed within five minutes under healthy database operation.
+  “Claimed” means the unique scheduled execution row exists; external ranking,
+  model, and delivery completion are not part of this latency target.
 - **SC-007**: In a representative history test set, 100% of materially unchanged
   previously delivered articles are excluded unless repetition is explicitly
   permitted, while eligible material updates remain selectable.
@@ -237,18 +246,25 @@ delivery for the execution and suppression of unchanged prior articles.
 ## Assumptions
 
 - Existing user identity, preferences, chosen language, news aggregation,
-  analysis, ranking, diversity, and messaging capabilities remain available.
+  analysis, deduplication, event grouping, ranking, diversity, and messaging
+  capabilities remain available.
 - Initial schedule, timezone, and enabled state can be provisioned through
   existing configuration or operational workflows; new user-facing commands
   for changing these three settings are outside this feature's scope.
 - The default digest count for users without a prior selection is 10.
+- Shared application-user provisioning is the sole creation path and creates the
+  preference profile and disabled-safe digest configuration in the same
+  transaction.
 - A schedule represents recurring local-time occurrences and only one digest is
   expected for each occurrence.
 - Existing news freshness policy defines “recent”; the scheduler does not
   introduce a competing freshness definition.
-- A material update is established by the existing article/story analysis
-  capability; simple re-publication, title edits, or source duplication alone
-  do not qualify.
+- A material update requires a later article in the same event plus either
+  accepted novelty analysis above policy threshold or a persisted versioned
+  comparison showing sufficient normalized-content change. The comparison
+  requires bounded non-empty source text and is blocked by duplicate/review
+  evidence; simple re-publication, title edits, and source duplication do not
+  qualify.
 - Direct, on-demand news requests remain separate from scheduled execution and
   may use their existing repetition behavior.
 - Automatic retries are bounded and reserved for failures classified as
@@ -256,4 +272,3 @@ delivery for the execution and suppression of unchanged prior articles.
   planning.
 - Delivery history is retained for at least as long as an article can remain
   eligible under freshness and repetition policies.
-

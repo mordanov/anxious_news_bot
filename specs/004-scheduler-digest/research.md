@@ -45,8 +45,10 @@ and fold policies make tests deterministic.
 
 **Decision**: Claim configurations in indexed batches with row locking that skips
 already claimed rows, insert one execution under a unique occurrence constraint,
-advance `next_due_at` in the same transaction, then process claimed execution IDs
-with bounded asynchronous concurrency. Catch and persist failures per execution.
+and advance `next_due_at` in the same transaction. One tick drains repeated
+batches until no due rows remain or a configured maximum of 1,000 claims or
+30-second claim-work budget is reached. Processing uses separate bounded
+asynchronous concurrency, and failures are persisted per execution.
 
 **Rationale**: A short claim transaction prevents duplicate scheduled work across
 overlapping ticks and future processes. Processing outside that transaction avoids
@@ -87,22 +89,33 @@ duplicating acknowledged earlier messages.
 
 **Decision**: Persist per-user history for confirmed and uncertain item delivery.
 Always exclude the same normalized article. For another article in the same
-event/story group, exclude it unless a newer complete analysis has novelty at or
-above a configurable material-update threshold and was published after the
-previous delivery. Apply this deterministic filter to candidate IDs before
-personal evaluation and ranking.
+event/story group, require later publication and either (a) a newer accepted
+analysis with novelty at or above the configurable material-update threshold or
+(b) a versioned deterministic comparison of persisted normalized text against
+the delivered article. The fallback requires both texts to meet a configured
+minimum length, content similarity at or below a configured maximum, and no
+persisted near-duplicate `duplicate` or `review` decision for the pair. Persist
+the comparison inputs' hashes, similarity, thresholds, basis, and outcome before
+applying the history filter.
 
-**Rationale**: Existing normalized article IDs, event groups, analyses, publication
-times, and novelty scores provide auditable evidence without a new semantic
-service. Conservative treatment of uncertain delivery prevents repetition.
-Filtering before ranking avoids spending model calls on prohibited candidates and
-keeps ranking mathematics unchanged.
+**Rationale**: Existing normalized article IDs/text, event groups, analyses,
+deduplication decisions, publication times, novelty scores, and deterministic
+comparison helper provide auditable production evidence without a new semantic
+service. Unlike relying on an already persisted `distinct` pair, the application
+actively produces and stores fallback evidence for every relevant candidate, so
+the path remains reachable with conservative baseline analysis. Event identity
+keeps the articles related, while substantial content delta and duplicate/review
+vetoes reject source copies. Filtering before ranking avoids model calls on
+prohibited candidates and keeps ranking mathematics unchanged.
 
 **Alternatives considered**:
 - URL-only history: rejected because equivalent articles and source duplicates
   can use different URLs.
 - Permanent event-group exclusion: rejected because it suppresses legitimate new
   developments.
+- Existing pairwise `distinct` decisions alone: rejected because same-event
+  assignment persists `same_event`, and a separate `distinct` comparison against
+  the delivered article is not guaranteed to exist.
 - Let an LLM decide repetition during every digest: rejected because it is
   nondeterministic, costly, and an inappropriate source of truth.
 
@@ -151,10 +164,13 @@ prevents order drift, and allows retries to reuse identical accepted content.
 ## 8. Persistence Layout and Retention
 
 **Decision**: Add separate configuration, execution, attempt, item, delivery-part,
-and history tables in migration `005`. Keep execution/item evidence long enough
-for retry and audit; retain compact history for at least the ranking freshness
-horizon and repetition policy. Backfill existing users with disabled digest
-configuration, count 10, 09:00 local time, and UTC timezone.
+and history tables in migration `005`. Backfill existing users, then extract the
+current application-user/profile claim into one shared infrastructure provisioner
+that atomically inserts application user, preference profile, and disabled-safe
+digest configuration for every future user. Both preference and digest
+repositories use this sole path. Keep execution/item evidence long enough for
+retry and audit; retain compact history for at least the ranking freshness
+horizon and repetition policy.
 
 **Rationale**: Separate lifecycle rows make state transitions and delivery
 acknowledgements enforceable with constraints. Disabled backfill avoids surprising
@@ -171,12 +187,14 @@ existing users because schedule/enable commands are outside this feature.
 ## 9. `/count` Ownership and User Creation
 
 **Decision**: Implement a digest configuration service and thin localized
-Telegram adapter. The service accepts only parsed integer values in 5..20,
-ensures the existing application user/profile through the preference repository,
-then upserts the user's disabled-safe digest configuration in one transaction.
+Telegram adapter. The service accepts only parsed integer values in 5..20 and
+calls its digest repository. The repository invokes the shared infrastructure
+provisioner, then updates the guaranteed configuration in the same transaction.
 
-**Rationale**: The command changes digest state, not preferences or ranking. Reuse
-of the existing user/profile claim avoids competing identity creation behavior.
+**Rationale**: The command changes digest state, not preferences or ranking. A
+single shared provisioner avoids competing identity creation behavior while also
+ensuring `/language`, `/tune`, `/specify`, and `/count` all create complete user
+state.
 
 **Alternatives considered**:
 - Put validation and persistence in the Telegram handler: rejected by the
@@ -185,4 +203,3 @@ of the existing user/profile claim avoids competing identity creation behavior.
   digest configuration, not semantic news preference.
 - Reject users without prior `/tune`: rejected because `/count` should work as an
   independent command.
-

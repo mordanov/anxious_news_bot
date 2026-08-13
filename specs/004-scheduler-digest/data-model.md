@@ -38,8 +38,10 @@ One row per application user.
 
 - Partial due-scan index on `(next_due_at, user_id)` where `enabled = true`.
 - `next_due_at` must be non-null when enabled after configuration activation.
-- Last success and failure fields update only when the candidate timestamp is
-  newer than the currently stored timestamp.
+- Last success and terminal-failure fields update only when the candidate
+  execution completion timestamp is newer than the currently stored timestamp.
+  Recovered transient attempts remain in attempt history and do not replace the
+  terminal-failure summary.
 - Execution references use deferred or post-create foreign keys to avoid table
   creation cycles.
 
@@ -199,8 +201,43 @@ Per-user evidence used by later candidate filtering.
   null.
 - `uncertain` history is treated as delivered for repetition filtering.
 - A later article in the same event group is eligible only when it was published
-  after prior history and its accepted complete analysis meets the configured
-  material-update novelty threshold.
+  after prior history and either its accepted complete analysis meets the
+  configured material-update novelty threshold or persisted versioned
+  material-update evidence records sufficient normalized-content delta.
+  Duplicate/review evidence for the pair vetoes the content-delta outcome.
+
+## Entity: DigestMaterialUpdateEvidence
+
+An immutable deterministic decision for one delivered-history/candidate pair.
+
+| Field | Type | Rules |
+|-------|------|-------|
+| id | UUID | Primary key |
+| delivery_history_id | UUID | FK to delivery history, cascade delete |
+| candidate_article_id | UUID | FK to normalized article, restrict delete |
+| candidate_analysis_id | UUID | FK to accepted analysis, restrict delete |
+| event_group_id | UUID | Shared event identity captured at comparison |
+| policy_version | string(100) | Version of deterministic comparison rules |
+| basis | enum | `accepted_novelty`, `content_delta`, or `insufficient_evidence` |
+| outcome | enum | `material_update` or `unchanged` |
+| prior_text_hash | string(64) | SHA-256 of canonical prior normalized text |
+| candidate_text_hash | string(64) | SHA-256 of canonical candidate normalized text |
+| content_similarity | decimal nullable | Exact five-place score for content-delta basis |
+| novelty_score | decimal nullable | Accepted novelty used for novelty basis |
+| threshold_snapshot | JSON | Novelty, similarity, minimum-length, and veto policy |
+| created_at | datetime | Required |
+
+**Indexes and constraints**:
+
+- Unique `(delivery_history_id, candidate_article_id, policy_version)`.
+- Both articles must be different, share the captured event group, and have
+  candidate publication later than the delivery history publication.
+- `accepted_novelty` requires novelty at or above the snapshotted threshold.
+- `content_delta` requires both canonical texts to meet minimum length,
+  similarity at or below the snapshotted maximum, and no duplicate/review veto.
+- `insufficient_evidence` always has `unchanged` outcome.
+- Repeated evaluation loads the existing row and never recomputes a decision
+  under the same policy version.
 
 ## Existing Entity Extensions
 
@@ -219,9 +256,13 @@ additional fields.
 
 ### Application User Creation
 
-Digest configuration creation reuses the existing preference repository's
-atomic application-user/profile claim. It does not create a competing identity
-upsert path.
+The existing application-user/profile claim moves to one shared infrastructure
+provisioner. In one transaction it upserts `ApplicationUser`,
+`PreferenceProfile`, and disabled-safe `DigestConfiguration`, then returns the
+three rows. Existing preference repository entry points and the digest
+configuration repository both use it. Migration `005` backfills pre-existing
+users; the provisioner guarantees every post-migration user also has exactly one
+configuration and self-heals a missing configuration on later interaction.
 
 ## Relationships
 
@@ -233,7 +274,9 @@ DigestExecution 1 --- * DigestItem
 DigestExecution 1 --- * DigestDeliveryPart
 DigestExecution 1 --- * DigestDeliveryHistory
 DigestItem       1 --- 0..1 DigestDeliveryHistory
+DigestDeliveryHistory 1 --- * DigestMaterialUpdateEvidence
 NormalizedArticle 1 --- * DigestItem / DigestDeliveryHistory
+NormalizedArticle 1 --- * DigestMaterialUpdateEvidence
 ArticleAnalysis   1 --- * DigestItem / DigestDeliveryHistory
 RankingRun        1 --- * DigestItem
 ```
@@ -266,6 +309,8 @@ retrying -> processing | composing | ready | delivering | failed
    attempt count; add running attempt; transition phase; commit.
 3. **Selection completion**: validate ranking result and history decisions;
    persist ranking linkage and selected count; commit.
+   Before ranking, material-update evidence for same-event history candidates is
+   inserted or loaded atomically under its pair/policy unique key.
 4. **Composition acceptance**: validate exact indexed output; atomically insert
    all immutable items and move to `ready`; commit.
 5. **Part preparation**: deterministically render all parts; atomically insert
@@ -291,4 +336,3 @@ retrying -> processing | composing | ready | delivering | failed
   removed.
 - Ranking and article records referenced by retained digest items/history use
   restrictive deletion; their existing retention jobs must skip referenced rows.
-

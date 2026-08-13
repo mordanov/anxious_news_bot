@@ -29,6 +29,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from anxious_news_bot.infrastructure.database import Base, TimestampMixin
 from anxious_news_bot.preferences.domain import (
+    ExplicitRequestStatus,
     PreferenceAction,
     PreferenceOrigin,
     QuestionnaireStatus,
@@ -58,6 +59,9 @@ class ApplicationUser(TimestampMixin, Base):
 
     profile: Mapped[PreferenceProfile | None] = relationship(back_populates="user")
     questionnaires: Mapped[list[Questionnaire]] = relationship(back_populates="user")
+    explicit_requests: Mapped[list[ExplicitPreferenceRequest]] = relationship(
+        back_populates="user"
+    )
 
 
 class PreferenceProfile(TimestampMixin, Base):
@@ -77,6 +81,7 @@ class PreferenceProfile(TimestampMixin, Base):
     parameters: Mapped[list[PreferenceParameter]] = relationship(
         back_populates="profile"
     )
+    evidence: Mapped[list[PreferenceEvidence]] = relationship(back_populates="profile")
 
 
 class PreferenceParameter(TimestampMixin, Base):
@@ -123,6 +128,9 @@ class PreferenceParameter(TimestampMixin, Base):
     )
 
     profile: Mapped[PreferenceProfile] = relationship(back_populates="parameters")
+    evidence_rows: Mapped[list[PreferenceEvidence]] = relationship(
+        back_populates="parameter"
+    )
 
 
 class Questionnaire(TimestampMixin, Base):
@@ -269,6 +277,63 @@ class QuestionnaireAnswer(Base):
     question: Mapped[QuestionnaireQuestion] = relationship(back_populates="answer")
 
 
+class ExplicitPreferenceRequest(TimestampMixin, Base):
+    __tablename__ = "explicit_preference_requests"
+    __table_args__ = (
+        UniqueConstraint(
+            "user_id",
+            "telegram_update_id",
+            name="uq_explicit_requests_user_update",
+        ),
+        CheckConstraint(
+            "base_profile_revision >= 0",
+            name="ck_explicit_requests_base_revision",
+        ),
+        CheckConstraint(
+            "length(normalized_text_hash) = 64",
+            name="ck_explicit_requests_text_hash",
+        ),
+        CheckConstraint(
+            "proposal_hash IS NULL OR length(proposal_hash) = 64",
+            name="ck_explicit_requests_proposal_hash",
+        ),
+        CheckConstraint(
+            "raw_text IS NULL OR length(btrim(raw_text)) > 0",
+            name="ck_explicit_requests_raw_text",
+        ),
+        Index("ix_explicit_requests_status_updated", "status", "updated_at"),
+    )
+
+    id: Mapped[UUID] = mapped_column(
+        PostgreSQLUUID(as_uuid=True), primary_key=True, default=uuid4
+    )
+    user_id: Mapped[UUID] = mapped_column(
+        ForeignKey("application_users.id", ondelete="CASCADE"), nullable=False
+    )
+    telegram_update_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    normalized_text_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    raw_text: Mapped[str | None] = mapped_column(Text)
+    language_code: Mapped[str | None] = mapped_column(String(35))
+    status: Mapped[ExplicitRequestStatus] = mapped_column(
+        _enum(ExplicitRequestStatus, "explicit_preference_request_status"),
+        nullable=False,
+    )
+    schema_version: Mapped[str] = mapped_column(String(20), nullable=False)
+    base_profile_revision: Mapped[int] = mapped_column(Integer, nullable=False)
+    interpretation_version: Mapped[str | None] = mapped_column(String(100))
+    proposal_hash: Mapped[str | None] = mapped_column(String(64))
+    error_code: Mapped[str | None] = mapped_column(String(100))
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    user: Mapped[ApplicationUser] = relationship(back_populates="explicit_requests")
+    update_batch: Mapped[PreferenceUpdateBatch | None] = relationship(
+        back_populates="explicit_request"
+    )
+    history: Mapped[list[PreferenceChangeHistory]] = relationship()
+    audit: Mapped[list[PreferenceChangeAudit]] = relationship()
+    evidence: Mapped[list[PreferenceEvidence]] = relationship()
+
+
 class PreferenceUpdateBatch(Base):
     __tablename__ = "preference_update_batches"
     __table_args__ = (
@@ -281,14 +346,22 @@ class PreferenceUpdateBatch(Base):
             name="ck_update_batches_result_revision",
         ),
         CheckConstraint("change_count >= 0", name="ck_update_batches_change_count"),
+        CheckConstraint(
+            "((questionnaire_id IS NOT NULL)::integer + "
+            "(explicit_request_id IS NOT NULL)::integer) = 1",
+            name="ck_update_batches_single_source",
+        ),
     )
 
     id: Mapped[UUID] = mapped_column(
         PostgreSQLUUID(as_uuid=True), primary_key=True, default=uuid4
     )
-    questionnaire_id: Mapped[UUID] = mapped_column(
+    questionnaire_id: Mapped[UUID | None] = mapped_column(
         ForeignKey("preference_questionnaires.id", ondelete="RESTRICT"),
-        nullable=False,
+        unique=True,
+    )
+    explicit_request_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("explicit_preference_requests.id", ondelete="RESTRICT"),
         unique=True,
     )
     user_id: Mapped[UUID] = mapped_column(
@@ -311,7 +384,12 @@ class PreferenceUpdateBatch(Base):
     )
     applied_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
-    questionnaire: Mapped[Questionnaire] = relationship(back_populates="update_batch")
+    questionnaire: Mapped[Questionnaire | None] = relationship(
+        back_populates="update_batch"
+    )
+    explicit_request: Mapped[ExplicitPreferenceRequest | None] = relationship(
+        back_populates="update_batch"
+    )
     history: Mapped[list[PreferenceChangeHistory]] = relationship(
         back_populates="batch"
     )
@@ -328,6 +406,12 @@ class PreferenceChangeHistory(Base):
             name="uq_preference_history_batch_parameter_action",
         ),
         CheckConstraint("length(btrim(reason)) > 0", name="ck_history_reason"),
+        CheckConstraint(
+            "(source = 'questionnaire' AND questionnaire_id IS NOT NULL AND explicit_request_id IS NULL) OR "
+            "(source = 'explicit' AND questionnaire_id IS NULL AND explicit_request_id IS NOT NULL) OR "
+            "(source IN ('inference', 'system') AND questionnaire_id IS NULL AND explicit_request_id IS NULL)",
+            name="ck_preference_change_history_source_reference",
+        ),
     )
 
     id: Mapped[UUID] = mapped_column(
@@ -348,6 +432,9 @@ class PreferenceChangeHistory(Base):
     questionnaire_id: Mapped[UUID | None] = mapped_column(
         ForeignKey("preference_questionnaires.id", ondelete="RESTRICT")
     )
+    explicit_request_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("explicit_preference_requests.id", ondelete="RESTRICT")
+    )
     previous_state: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     new_state: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
     reason: Mapped[str] = mapped_column(Text, nullable=False)
@@ -367,6 +454,12 @@ class PreferenceChangeAudit(Base):
             "action",
             name="uq_preference_audit_batch_parameter_action",
         ),
+        CheckConstraint(
+            "(source = 'questionnaire' AND questionnaire_id IS NOT NULL AND explicit_request_id IS NULL) OR "
+            "(source = 'explicit' AND questionnaire_id IS NULL AND explicit_request_id IS NOT NULL) OR "
+            "(source IN ('inference', 'system') AND questionnaire_id IS NULL AND explicit_request_id IS NULL)",
+            name="ck_preference_change_audit_source_reference",
+        ),
     )
 
     id: Mapped[UUID] = mapped_column(PostgreSQLUUID(as_uuid=True), primary_key=True)
@@ -385,6 +478,9 @@ class PreferenceChangeAudit(Base):
     questionnaire_id: Mapped[UUID | None] = mapped_column(
         ForeignKey("preference_questionnaires.id", ondelete="RESTRICT")
     )
+    explicit_request_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("explicit_preference_requests.id", ondelete="RESTRICT")
+    )
     previous_state_hash: Mapped[str | None] = mapped_column(String(64))
     new_state_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     reason_hash: Mapped[str] = mapped_column(String(64), nullable=False)
@@ -393,3 +489,57 @@ class PreferenceChangeAudit(Base):
     )
 
     batch: Mapped[PreferenceUpdateBatch] = relationship(back_populates="audit")
+
+
+class PreferenceEvidence(Base):
+    __tablename__ = "preference_evidence"
+    __table_args__ = (
+        CheckConstraint(
+            "(source = 'questionnaire' AND questionnaire_id IS NOT NULL AND explicit_request_id IS NULL) OR "
+            "(source = 'explicit' AND questionnaire_id IS NULL AND explicit_request_id IS NOT NULL) OR "
+            "(source IN ('inference', 'system') AND questionnaire_id IS NULL AND explicit_request_id IS NULL)",
+            name="ck_preference_evidence_source_reference",
+        ),
+        CheckConstraint(
+            "length(reason_hash) = 64",
+            name="ck_preference_evidence_reason_hash",
+        ),
+        CheckConstraint(
+            "requested_weight IS NULL OR (requested_weight >= -1.00 AND requested_weight <= 1.00)",
+            name="ck_preference_evidence_requested_weight",
+        ),
+        Index("ix_preference_evidence_parameter_created", "parameter_id", "created_at"),
+    )
+
+    id: Mapped[UUID] = mapped_column(
+        PostgreSQLUUID(as_uuid=True), primary_key=True, default=uuid4
+    )
+    parameter_id: Mapped[UUID] = mapped_column(
+        ForeignKey("preference_parameters.id", ondelete="RESTRICT"), nullable=False
+    )
+    user_id: Mapped[UUID] = mapped_column(
+        ForeignKey("preference_profiles.user_id", ondelete="CASCADE"), nullable=False
+    )
+    source: Mapped[PreferenceOrigin] = mapped_column(
+        _enum(PreferenceOrigin, "preference_origin"), nullable=False
+    )
+    explicit_request_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("explicit_preference_requests.id", ondelete="RESTRICT")
+    )
+    questionnaire_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("preference_questionnaires.id", ondelete="RESTRICT")
+    )
+    action: Mapped[PreferenceAction] = mapped_column(
+        _enum(PreferenceAction, "preference_action"), nullable=False
+    )
+    requested_weight: Mapped[Decimal | None] = mapped_column(Numeric(3, 2))
+    active: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    reason_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=sql_text("now()")
+    )
+
+    parameter: Mapped[PreferenceParameter] = relationship(
+        back_populates="evidence_rows"
+    )
+    profile: Mapped[PreferenceProfile] = relationship(back_populates="evidence")

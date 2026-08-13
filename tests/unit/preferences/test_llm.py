@@ -41,6 +41,123 @@ async def test_structured_adapter_returns_untrusted_mapping() -> None:
     assert len(value["questions"]) == 10
 
 
+@pytest.mark.parametrize("status_code", [429, 500, 503])
+async def test_structured_adapter_retries_transient_http_statuses(
+    status_code: int,
+) -> None:
+    calls = 0
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            return httpx.Response(status_code, request=request)
+        return httpx.Response(
+            200,
+            json={
+                "choices": [
+                    {"message": {"content": json.dumps(generated_questionnaire())}}
+                ]
+            },
+        )
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        adapter = StructuredPreferenceModelAdapter(
+            client,
+            base_url="https://model.example/v1",
+            api_key="secret",
+            model="test",
+            retry_attempts=2,
+        )
+        value = await adapter.generate(
+            QuestionnaireContext(ProfileSnapshot(uuid4(), 0, ()), "en")
+        )
+
+    assert calls == 2
+    assert len(value["questions"]) == 10
+
+
+async def test_structured_adapter_retries_transport_errors() -> None:
+    calls = 0
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            raise httpx.RemoteProtocolError("connection dropped", request=request)
+        return httpx.Response(
+            200,
+            json={
+                "choices": [
+                    {"message": {"content": json.dumps(generated_questionnaire())}}
+                ]
+            },
+        )
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        adapter = StructuredPreferenceModelAdapter(
+            client,
+            base_url="https://model.example/v1",
+            api_key="secret",
+            model="test",
+            retry_attempts=2,
+        )
+        value = await adapter.generate(
+            QuestionnaireContext(ProfileSnapshot(uuid4(), 0, ()), "en")
+        )
+
+    assert calls == 2
+    assert len(value["questions"]) == 10
+
+
+async def test_structured_adapter_does_not_retry_non_transient_http_status() -> None:
+    calls = 0
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        calls += 1
+        return httpx.Response(400, request=request)
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        adapter = StructuredPreferenceModelAdapter(
+            client,
+            base_url="https://model.example/v1",
+            api_key="secret",
+            model="test",
+            retry_attempts=3,
+        )
+        with pytest.raises(QuestionnaireGenerationFailed):
+            await adapter.generate(
+                QuestionnaireContext(ProfileSnapshot(uuid4(), 0, ()), "en")
+            )
+
+    assert calls == 1
+
+
+async def test_structured_adapter_caps_transient_status_attempts() -> None:
+    calls = 0
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        calls += 1
+        return httpx.Response(503, request=request)
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        adapter = StructuredPreferenceModelAdapter(
+            client,
+            base_url="https://model.example/v1",
+            api_key="secret",
+            model="test",
+            retry_attempts=2,
+        )
+        with pytest.raises(QuestionnaireGenerationFailed):
+            await adapter.generate(
+                QuestionnaireContext(ProfileSnapshot(uuid4(), 0, ()), "en")
+            )
+
+    assert calls == 2
+
+
 async def test_unconfigured_adapter_fails_closed() -> None:
     async with httpx.AsyncClient() as client:
         adapter = StructuredPreferenceModelAdapter(

@@ -1,25 +1,21 @@
 from __future__ import annotations
 
-import json
 from collections.abc import Mapping, Sequence
 from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
 import httpx
-from tenacity import (
-    AsyncRetrying,
-    retry_if_exception_type,
-    stop_after_attempt,
-    wait_exponential,
-)
 
+from anxious_news_bot.infrastructure.structured_model import StructuredModelTransport
 from anxious_news_bot.preferences.domain import ProfileSnapshot, QuestionnaireContext
 from anxious_news_bot.preferences.errors import (
     InterpretationFailed,
     QuestionnaireGenerationFailed,
 )
 from anxious_news_bot.preferences.schemas import CreateChangeSchema
+
+EXPLICIT_INTERPRETATION_VERSION = "explicit-preference-v1"
 
 
 class StructuredPreferenceModelAdapter:
@@ -33,14 +29,18 @@ class StructuredPreferenceModelAdapter:
         timeout_seconds: float = 30.0,
         retry_attempts: int = 2,
         max_response_bytes: int = 262_144,
+        explicit_history_limit: int = 20,
     ) -> None:
-        self._client = client
-        self._base_url = base_url.rstrip("/")
-        self._api_key = api_key
-        self._model = model
-        self._timeout_seconds = timeout_seconds
-        self._retry_attempts = retry_attempts
-        self._max_response_bytes = max_response_bytes
+        self._transport = StructuredModelTransport(
+            client,
+            base_url=base_url,
+            api_key=api_key,
+            model=model,
+            timeout_seconds=timeout_seconds,
+            retry_attempts=retry_attempts,
+            max_response_bytes=max_response_bytes,
+        )
+        self._explicit_history_limit = explicit_history_limit
 
     async def generate(self, context: QuestionnaireContext) -> Mapping[str, Any]:
         if not self._configured:
@@ -126,6 +126,44 @@ class StructuredPreferenceModelAdapter:
                 raise
             raise InterpretationFailed("model request failed") from exc
 
+    async def interpret(
+        self,
+        request_id: UUID,
+        statement: str,
+        profile_snapshot: ProfileSnapshot,
+        relevant_history: Sequence[Mapping[str, Any]],
+    ) -> Mapping[str, Any]:
+        if not self._configured:
+            raise InterpretationFailed("preference model is not configured")
+        prompt = {
+            "request_id": str(request_id),
+            "schema_version": "1.0",
+            "interpretation_version": EXPLICIT_INTERPRETATION_VERSION,
+            "statement": statement,
+            "profile": self._profile(profile_snapshot),
+            "relevant_history": [
+                dict(item) for item in relevant_history[: self._explicit_history_limit]
+            ],
+            "instructions": (
+                "Interpret one explicit news-preference statement as an incremental "
+                "change set. Keep specific intent specific. Reuse equivalent active "
+                "or inactive parameters instead of proposing duplicates. A narrower "
+                "distinct concept may create a new explicit preference. Do not "
+                "broaden, weaken, deactivate, or relabel unrelated explicit "
+                "preferences. Use canonical two-decimal weights and concise reasons."
+            ),
+        }
+        try:
+            return await self._request(
+                "explicit_preference_changes",
+                prompt,
+                self._explicit_changes_schema(),
+            )
+        except Exception as exc:
+            if isinstance(exc, InterpretationFailed):
+                raise
+            raise InterpretationFailed("model request failed") from exc
+
     async def classify(
         self,
         proposal: CreateChangeSchema,
@@ -164,7 +202,7 @@ class StructuredPreferenceModelAdapter:
 
     @property
     def _configured(self) -> bool:
-        return bool(self._base_url and self._api_key and self._model)
+        return self._transport.configured
 
     async def _request(
         self,
@@ -172,50 +210,7 @@ class StructuredPreferenceModelAdapter:
         prompt: Mapping[str, Any],
         schema: Mapping[str, Any],
     ) -> Mapping[str, Any]:
-        retrying = AsyncRetrying(
-            stop=stop_after_attempt(self._retry_attempts),
-            wait=wait_exponential(min=0.2, max=2),
-            retry=retry_if_exception_type((httpx.ConnectError, httpx.TimeoutException)),
-            reraise=True,
-        )
-        async for attempt in retrying:
-            with attempt:
-                response = await self._client.post(
-                    f"{self._base_url}/chat/completions",
-                    timeout=self._timeout_seconds,
-                    headers={"Authorization": f"Bearer {self._api_key}"},
-                    json={
-                        "model": self._model,
-                        "messages": [
-                            {
-                                "role": "user",
-                                "content": json.dumps(
-                                    prompt,
-                                    ensure_ascii=False,
-                                    separators=(",", ":"),
-                                ),
-                            }
-                        ],
-                        "response_format": {
-                            "type": "json_schema",
-                            "json_schema": {
-                                "name": name,
-                                "strict": True,
-                                "schema": schema,
-                            },
-                        },
-                    },
-                )
-                response.raise_for_status()
-                if len(response.content) > self._max_response_bytes:
-                    raise ValueError("model response exceeds configured size")
-                body = response.json()
-                content = body["choices"][0]["message"]["content"]
-                value = json.loads(content) if isinstance(content, str) else content
-                if not isinstance(value, dict):
-                    raise ValueError("model response must be an object")
-                return value
-        raise RuntimeError("unreachable")
+        return await self._transport.request(name, prompt, schema)
 
     @staticmethod
     def _profile(profile: ProfileSnapshot) -> Mapping[str, Any]:
@@ -247,3 +242,9 @@ class StructuredPreferenceModelAdapter:
         from anxious_news_bot.preferences.schemas import PreferenceChangesSchema
 
         return PreferenceChangesSchema.model_json_schema()
+
+    @staticmethod
+    def _explicit_changes_schema() -> Mapping[str, Any]:
+        from anxious_news_bot.preferences.schemas import ExplicitPreferenceChangesSchema
+
+        return ExplicitPreferenceChangesSchema.model_json_schema()

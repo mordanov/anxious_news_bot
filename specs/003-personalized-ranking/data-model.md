@@ -294,8 +294,8 @@ Score, eligibility, and final disposition of one candidate article.
 | id | UUID | Primary key |
 | ranking_run_id | UUID | Required reference to RankingRun |
 | article_id | UUID | Required reference to NormalizedArticle |
-| article_analysis_id | UUID | Required reference to accepted ArticleAnalysis |
-| evaluation_run_id | UUID | Optional only for documented neutral profile states |
+| article_analysis_id | UUID | Optional only when generic analysis is missing; otherwise references the accepted ArticleAnalysis |
+| evaluation_run_id | UUID | Optional for documented neutral or ineligible states |
 | event_group_id / source_id | UUID | Snapshot identities used by diversity |
 | topic_key | text | Optional deterministic primary topic snapshot |
 | personal_numerator / denominator | decimal | Required exact snapshots |

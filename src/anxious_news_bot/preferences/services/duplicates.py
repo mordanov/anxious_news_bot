@@ -7,10 +7,17 @@ from dataclasses import dataclass
 from difflib import SequenceMatcher
 from uuid import UUID
 
-from anxious_news_bot.preferences.domain import ProfileSnapshot
+from anxious_news_bot.preferences.domain import PreferenceParameter, ProfileSnapshot
 from anxious_news_bot.preferences.errors import PreferenceProposalInvalid
 from anxious_news_bot.preferences.ports import PreferenceEquivalenceClassifier
-from anxious_news_bot.preferences.schemas import CreateChangeSchema, EquivalenceSchema
+from anxious_news_bot.preferences.schemas import (
+    AdjustChangeSchema,
+    CreateChangeSchema,
+    EquivalenceSchema,
+    PreferenceChangeSchema,
+    ReactivateChangeSchema,
+    RefineChangeSchema,
+)
 
 
 def normalize_semantic_key(value: str) -> str:
@@ -90,3 +97,53 @@ class PreferenceDuplicateDetector:
     @staticmethod
     def _normalize(value: str) -> str:
         return " ".join(unicodedata.normalize("NFKC", value).casefold().split())
+
+
+def rewrite_equivalent_create(
+    change: CreateChangeSchema,
+    parameter: PreferenceParameter,
+) -> tuple[PreferenceChangeSchema, ...]:
+    changes: list[PreferenceChangeSchema] = []
+    if not parameter.active:
+        changes.append(
+            ReactivateChangeSchema.model_validate(
+                {
+                    "action": "reactivate",
+                    "parameter_id": parameter.id,
+                    "reason": change.reason,
+                },
+                strict=True,
+            )
+        )
+    if change.weight != parameter.weight:
+        changes.append(
+            AdjustChangeSchema.model_validate(
+                {
+                    "action": "adjust",
+                    "parameter_id": parameter.id,
+                    "target_weight": change.target_weight,
+                    "reason": change.reason,
+                },
+                strict=True,
+            )
+        )
+    if any(
+        (
+            change.name != parameter.name,
+            change.description != parameter.description,
+            change.evaluation_instructions != parameter.evaluation_instructions,
+        )
+    ):
+        payload = {
+            "action": "refine",
+            "parameter_id": parameter.id,
+            "reason": change.reason,
+        }
+        if change.name != parameter.name:
+            payload["name"] = change.name
+        if change.description != parameter.description:
+            payload["description"] = change.description
+        if change.evaluation_instructions != parameter.evaluation_instructions:
+            payload["evaluation_instructions"] = change.evaluation_instructions
+        changes.append(RefineChangeSchema.model_validate(payload, strict=True))
+    return tuple(changes)

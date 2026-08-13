@@ -6,12 +6,15 @@ from typing import Any, Protocol, runtime_checkable
 from uuid import UUID
 
 from anxious_news_bot.preferences.domain import (
+    ExplicitRequestClaim,
     ProfileSnapshot,
     QuestionnaireContext,
+    SpecifyState,
     TuneState,
 )
 from anxious_news_bot.preferences.schemas import (
     CreateChangeSchema,
+    ExplicitPreferenceChangesSchema,
     PreferenceChangesSchema,
     QuestionnaireGenerationSchema,
 )
@@ -29,6 +32,17 @@ class PreferenceInterpreter(Protocol):
         profile: ProfileSnapshot,
         questionnaire_id: UUID,
         answers: Sequence[tuple[str, str]],
+    ) -> Mapping[str, Any]: ...
+
+
+@runtime_checkable
+class ExplicitPreferenceInterpreter(Protocol):
+    async def interpret(
+        self,
+        request_id: UUID,
+        statement: str,
+        profile_snapshot: ProfileSnapshot,
+        relevant_history: Sequence[Mapping[str, Any]],
     ) -> Mapping[str, Any]: ...
 
 
@@ -94,6 +108,40 @@ class PreferenceRepositoryPort(Protocol):
     async def fail(
         self, questionnaire_id: UUID, error_code: str, failed_at: datetime
     ) -> TuneState: ...
+
+    async def claim_explicit_request(
+        self,
+        telegram_user_id: int,
+        telegram_update_id: int,
+        statement: str,
+        language_code: str | None,
+        claimed_at: datetime,
+    ) -> ExplicitRequestClaim: ...
+
+    async def load_explicit_context(
+        self, request_id: UUID
+    ) -> tuple[ProfileSnapshot, Sequence[Mapping[str, Any]]]: ...
+
+    async def apply_explicit_changes(
+        self,
+        request_id: UUID,
+        proposal: ExplicitPreferenceChangesSchema,
+        applied_at: datetime,
+    ) -> SpecifyState: ...
+
+    async def complete_no_change(
+        self,
+        request_id: UUID,
+        proposal_hash: str,
+        completed_at: datetime,
+    ) -> SpecifyState: ...
+
+    async def fail_explicit_request(
+        self,
+        request_id: UUID,
+        error_code: str,
+        failed_at: datetime,
+    ) -> SpecifyState: ...
 
     async def duplicate_candidates(
         self,

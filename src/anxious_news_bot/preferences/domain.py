@@ -32,6 +32,16 @@ class PreferenceAction(StrEnum):
     REACTIVATE = "reactivate"
 
 
+class ExplicitRequestStatus(StrEnum):
+    RECEIVED = "received"
+    INTERPRETING = "interpreting"
+    VALIDATED = "validated"
+    APPLYING = "applying"
+    STALE = "stale"
+    APPLIED = "applied"
+    FAILED = "failed"
+
+
 class UpdateBatchStatus(StrEnum):
     VALIDATED = "validated"
     APPLIED = "applied"
@@ -44,6 +54,15 @@ class TuneStateKind(StrEnum):
     QUESTION = "question"
     PROCESSING = "processing"
     COMPLETED = "completed"
+    FAILED = "failed"
+
+
+class SpecifyStateKind(StrEnum):
+    PROCESSING = "processing"
+    APPLIED = "applied"
+    NO_CHANGE = "no_change"
+    INVALID = "invalid"
+    STALE_RETRY = "stale_retry"
     FAILED = "failed"
 
 
@@ -106,6 +125,21 @@ class TuneState:
     question: str | None = None
     options: tuple[TuneOption, ...] = ()
     message: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class SpecifyState:
+    kind: SpecifyStateKind
+    request_id: UUID | None = None
+    action: PreferenceAction | None = None
+    parameter_name: str | None = None
+    message: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class ExplicitRequestClaim:
+    request_id: UUID
+    replay_state: SpecifyState | None = None
 
 
 @dataclass(frozen=True, slots=True)

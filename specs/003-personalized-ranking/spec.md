@@ -277,11 +277,12 @@ limits apply deterministically and every displacement is explainable.
 ### Constitution Alignment *(mandatory)*
 
 - **Affected Modules**: User preferences owns `/specify` interpretation and
-  deterministic profile updates; article analysis owns semantic
-  article-to-parameter evidence; personal ranking owns scoring, explanations, and
-  diversity selection. Telegram remains a thin command adapter. Aggregation
-  provides only the general article pool, and digest delivery consumes ranking
-  output without controlling ranking logic.
+  deterministic profile updates; personal ranking owns user-specific semantic
+  article-to-parameter evaluation, scoring, explanations, and diversity
+  selection. Telegram remains a thin command adapter. News aggregation and
+  generic article analysis provide only the general article pool and generic
+  evidence, and digest delivery consumes ranking output without controlling
+  ranking logic.
 - **Personalization Impact**: Explicit statements have the highest semantic
   authority. Specific intent remains specific, equivalent parameters are reused,
   and ranking combines signed parameter contributions without allowing generic

@@ -55,8 +55,35 @@ from anxious_news_bot.preferences.services.repetition import (
 from anxious_news_bot.preferences.services.retention import (
     PreferenceRetentionService,
 )
+from anxious_news_bot.preferences.services.specify import ExplicitPreferenceService
 from anxious_news_bot.preferences.services.tokens import SecureCallbackTokenFactory
 from anxious_news_bot.preferences.services.tune import PreferenceTuningService
+from anxious_news_bot.ranking.infrastructure.llm import (
+    ARTICLE_EVALUATION_PROMPT_VERSION,
+    STRUCTURED_EVALUATOR_NAME,
+    STRUCTURED_EVALUATOR_VERSION,
+    StructuredArticlePreferenceEvaluator,
+)
+from anxious_news_bot.ranking.infrastructure.persistence import (
+    SQLAlchemyRankingRepository,
+)
+from anxious_news_bot.ranking.infrastructure.persistence import (
+    SystemClock as RankingClock,
+)
+from anxious_news_bot.ranking.infrastructure.retention import (
+    RankingRetentionScheduler,
+)
+from anxious_news_bot.ranking.services.configuration import (
+    ValidatedRankingConfigurationProvider,
+)
+from anxious_news_bot.ranking.services.evaluate import ArticleEvaluationService
+from anxious_news_bot.ranking.services.explain import (
+    DeterministicRankingExplainer,
+)
+from anxious_news_bot.ranking.services.rank import PersonalRankingService
+from anxious_news_bot.ranking.services.retention import RankingRetentionService
+from anxious_news_bot.ranking.services.score import DeterministicRankingScorer
+from anxious_news_bot.telegram.specify import SpecifyTelegramAdapter
 from anxious_news_bot.telegram.tune import CALLBACK_PREFIX, TuneTelegramAdapter
 
 LOGGER = logging.getLogger(__name__)
@@ -142,6 +169,7 @@ def build_application(settings: Settings) -> Application:
         database,
         history_context_limit=settings.preferences_history_question_limit,
         duplicate_threshold=settings.preferences_duplicate_review_threshold,
+        explicit_history_limit=settings.preferences_explicit_history_limit,
     )
     preference_model = StructuredPreferenceModelAdapter(
         client,
@@ -151,32 +179,85 @@ def build_application(settings: Settings) -> Application:
         timeout_seconds=settings.preferences_model_timeout_seconds,
         retry_attempts=settings.preferences_model_retry_attempts,
         max_response_bytes=settings.preferences_model_max_response_bytes,
+        explicit_history_limit=settings.preferences_explicit_history_limit,
     )
     preference_clock = PreferenceClock()
+    change_validator = DeterministicPreferenceChangeValidator()
+    duplicate_detector = PreferenceDuplicateDetector(
+        preference_model,
+        candidate_threshold=settings.preferences_duplicate_review_threshold,
+    )
     tuning_service = PreferenceTuningService(
         preference_repository,
         preference_model,
         DeterministicQuestionnaireQualityValidator(
             repetition_threshold=settings.preferences_repetition_threshold
         ),
-        DeterministicPreferenceChangeValidator(),
+        change_validator,
         SecureCallbackTokenFactory(),
         preference_clock,
-        duplicate_detector=PreferenceDuplicateDetector(
-            preference_model,
-            candidate_threshold=settings.preferences_duplicate_review_threshold,
-        ),
+        duplicate_detector=duplicate_detector,
         repetition_detector=SubstantialRepetitionDetector(
             threshold=settings.preferences_repetition_threshold
         ),
     )
+    specify_service = ExplicitPreferenceService(
+        preference_repository,
+        preference_model,
+        change_validator,
+        preference_clock,
+        duplicate_detector=duplicate_detector,
+        stale_retry_limit=settings.preferences_explicit_stale_retry_limit,
+        max_statement_length=settings.preferences_explicit_request_max_length,
+    )
     tune_adapter = TuneTelegramAdapter(tuning_service)
+    specify_adapter = SpecifyTelegramAdapter(
+        specify_service,
+        max_text_length=settings.preferences_explicit_request_max_length,
+    )
     retention_service = PreferenceRetentionService(
         preference_repository,
         preference_clock,
         questionnaire_days=settings.preferences_questionnaire_retention_days,
         history_days=settings.preferences_change_history_retention_days,
         batch_size=settings.preferences_retention_batch_size,
+    )
+    ranking_repository = SQLAlchemyRankingRepository(database)
+    ranking_evaluator = StructuredArticlePreferenceEvaluator(
+        client,
+        base_url=settings.ranking_model_base_url,
+        api_key=settings.ranking_model_api_key,
+        model=settings.ranking_model_name,
+        timeout_seconds=settings.ranking_model_timeout_seconds,
+        retry_attempts=settings.ranking_model_retry_attempts,
+        max_response_bytes=settings.ranking_model_max_response_bytes,
+    )
+    article_evaluation_service = ArticleEvaluationService(
+        ranking_repository,
+        ranking_evaluator,
+        preference_clock,
+        evaluator_name=STRUCTURED_EVALUATOR_NAME,
+        evaluator_version=STRUCTURED_EVALUATOR_VERSION,
+        prompt_version=ARTICLE_EVALUATION_PROMPT_VERSION,
+        retry_attempts=settings.ranking_evaluation_retry_attempts,
+    )
+    ranking_configuration_provider = (
+        ValidatedRankingConfigurationProvider.from_settings(settings)
+    )
+    ranking_scorer = DeterministicRankingScorer()
+    ranking_explainer = DeterministicRankingExplainer()
+    personal_ranking_service = PersonalRankingService(
+        ranking_repository,
+        ranking_configuration_provider,
+        ranking_scorer,
+        RankingClock(),
+    )
+    ranking_retention_service = RankingRetentionService(
+        ranking_repository,
+        RankingClock(),
+        raw_response_days=settings.ranking_raw_response_retention_days,
+        detail_days=settings.ranking_detail_retention_days,
+        batch_size=settings.ranking_retention_batch_size,
     )
 
     async def post_init(application: Application) -> None:
@@ -196,6 +277,15 @@ def build_application(settings: Settings) -> Application:
         )
         application.bot_data["preference_retention_scheduler"] = retention_scheduler
         retention_scheduler.start()
+        ranking_retention_scheduler = RankingRetentionScheduler(
+            application.job_queue,
+            ranking_retention_service,
+            interval_seconds=settings.ranking_retention_scan_interval_seconds,
+        )
+        application.bot_data["ranking_retention_scheduler"] = (
+            ranking_retention_scheduler
+        )
+        ranking_retention_scheduler.start()
 
     async def post_shutdown(application: Application) -> None:
         scheduler = application.bot_data.pop("news_scheduler", None)
@@ -206,6 +296,12 @@ def build_application(settings: Settings) -> Application:
         )
         if retention_scheduler is not None:
             retention_scheduler.stop()
+        ranking_retention_scheduler = application.bot_data.pop(
+            "ranking_retention_scheduler",
+            None,
+        )
+        if ranking_retention_scheduler is not None:
+            ranking_retention_scheduler.stop()
         await client.aclose()
         await database.close()
 
@@ -218,6 +314,7 @@ def build_application(settings: Settings) -> Application:
     )
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("tune", tune_adapter.command))
+    application.add_handler(CommandHandler("specify", specify_adapter.command))
     application.add_handler(
         CallbackQueryHandler(
             tune_adapter.callback,
@@ -225,6 +322,15 @@ def build_application(settings: Settings) -> Application:
         )
     )
     application.add_error_handler(handle_error)
+    application.bot_data["article_evaluation_service"] = article_evaluation_service
+    application.bot_data["ranking_configuration_provider"] = (
+        ranking_configuration_provider
+    )
+    application.bot_data["ranking_scorer"] = ranking_scorer
+    application.bot_data["ranking_explainer"] = ranking_explainer
+    application.bot_data["personal_ranking_service"] = personal_ranking_service
+    application.bot_data["ranking_repository"] = ranking_repository
+    application.bot_data["ranking_evaluator"] = ranking_evaluator
     return application
 
 

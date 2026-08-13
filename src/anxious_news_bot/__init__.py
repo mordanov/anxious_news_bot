@@ -1,2 +1,1 @@
 """Anxious News Bot package."""
-

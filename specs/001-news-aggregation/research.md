@@ -63,12 +63,25 @@ References: [urllib.parse](https://docs.python.org/3.11/library/urllib.parse.htm
 **Decision**: Enable PostgreSQL `pg_trgm`. Generate candidates within language and
 publication-time windows, compare normalized title and bounded content, and persist
 scores, thresholds, normalization version, and the resulting
-duplicate/review/distinct decision. Keep semantic event grouping as a separate
-enrichment decision.
+duplicate/review/distinct decision.
+
+Keep event grouping separate from duplicate classification but make its initial
+policy deterministic and enrichment-independent. Compare distinct-source,
+same-language reports within 48 hours, using ingestion time when publication time
+is missing. Calculate a weighted score from title similarity (0.50), content
+similarity (0.30), normalized topic overlap (0.10), and normalized geographic
+overlap (0.10). Require either shared topic/geography or title similarity of at
+least 0.55. Scores at or above 0.62 join the event, scores from 0.52 through 0.6199
+produce a review proposal, and lower scores remain distinct. Persist every signal,
+weight, threshold, window, and algorithm version. These defaults are configuration
+and must be calibrated against the labeled corpus.
 
 **Rationale**: Trigram similarity is deterministic, multilingual, indexable, and
 requires no vector store. Separating textual duplication from event equivalence
-prevents differently worded event reports from being treated as exact copies.
+prevents differently worded event reports from being treated as exact copies. The
+weighted evidence policy makes US2 repeatable before any optional enrichment;
+validated enrichment may later propose an auditable reassignment but is not an
+input to the initial decision.
 
 **Alternatives considered**: In-memory RapidFuzz is suitable for small batches but
 does not solve indexed candidate retrieval. MinHash and embeddings add tuning or
@@ -101,7 +114,11 @@ idempotent source GETs for connection failures, selected timeouts, 408, 429, and
 transient 5xx responses. Honor Retry-After. Run source tasks under a configurable
 semaphore; each task records and contains expected failures. Use an in-process
 scheduler only when periodic execution is added and guard overlapping cycles with
-a PostgreSQL advisory lock.
+an application-scoped PostgreSQL advisory lock. Enable the existing Telegram
+application's JobQueue integration as the in-process clock: a startup-registered
+repeating callback invokes only the NewsAggregator application service, and
+shutdown removes the job cleanly. The scheduler scan interval is independent from
+each source's polling interval; every tick queries only enabled due sources.
 
 **Rationale**: Bounded retries handle transient source faults without hanging a
 cycle. Isolated tasks and transactions preserve sibling progress. The existing
@@ -115,6 +132,24 @@ References: [Tenacity](https://tenacity.readthedocs.io/en/latest/),
 [HTTPX transports](https://www.python-httpx.org/advanced/transports/),
 [PostgreSQL advisory locks](https://www.postgresql.org/docs/current/explicit-locking.html#ADVISORY-LOCKS).
 
+## Operator source management
+
+**Decision**: Provide a versioned JSON source-catalog schema and a local CLI with
+`validate` and `apply` modes. Validation parses the entire file strictly and
+detects duplicate stable identifiers or endpoint conflicts. Apply performs one
+database transaction that upserts every listed source, including explicit
+enable/disable changes; omitted sources remain unchanged. Output is a sanitized
+add/update/unchanged summary.
+
+**Rationale**: A file contract is reviewable, repeatable, automation-friendly, and
+does not require adding an administration web service or placing operational
+management in Telegram handlers. All-or-nothing application prevents a partially
+updated catalog.
+
+**Alternatives considered**: Direct database edits bypass validation. Telegram
+administration commands mix operational control into the adapter. A web admin UI
+is unnecessary for the initial source count.
+
 ## Testing strategy
 
 **Decision**: Use pytest and pytest-asyncio with injected adapters, HTTPX
@@ -127,4 +162,3 @@ semantics are verified where they actually run.
 
 **Alternatives considered**: Live source or LLM tests are nondeterministic.
 SQLite cannot validate PostgreSQL JSON, advisory lock, trigram, or upsert behavior.
-

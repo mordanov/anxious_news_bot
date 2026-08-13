@@ -17,4 +17,3 @@ async def test_start_without_message_does_not_reply() -> None:
     update.message = None
 
     await start(update, AsyncMock())
-

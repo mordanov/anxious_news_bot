@@ -1,0 +1,84 @@
+name: anxious-news-bot
+
+x-database-environment: &database-environment
+  POSTGRES_HOST: postgres
+  POSTGRES_PORT: "5432"
+  POSTGRES_USER: ${POSTGRES_USER:-anxious_news}
+  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-anxious_news}
+  POSTGRES_ADMIN_DATABASE: postgres
+  APP_DATABASE_NAME: ${POSTGRES_DB:-anxious_news}
+
+x-application-environment: &application-environment
+  DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-anxious_news}:${POSTGRES_PASSWORD:-anxious_news}@postgres:5432/${POSTGRES_DB:-anxious_news}
+  NEWS_SCHEDULER_INTERVAL_SECONDS: ${NEWS_SCHEDULER_INTERVAL_SECONDS:-60}
+  NEWS_FETCH_TIMEOUT_SECONDS: ${NEWS_FETCH_TIMEOUT_SECONDS:-20}
+  NEWS_FETCH_RETRY_ATTEMPTS: ${NEWS_FETCH_RETRY_ATTEMPTS:-3}
+  NEWS_MAX_CONCURRENCY: ${NEWS_MAX_CONCURRENCY:-5}
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-anxious_news}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-anxious_news}
+      POSTGRES_DB: postgres
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U "$$POSTGRES_USER" -d postgres
+      interval: 2s
+      timeout: 5s
+      retries: 15
+    restart: unless-stopped
+
+  db-init:
+    build:
+      context: .
+    command: ["python", "docker/ensure_database.py"]
+    environment:
+      <<: *database-environment
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  migrate:
+    build:
+      context: .
+    command: ["alembic", "upgrade", "head"]
+    environment:
+      <<: *application-environment
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
+    restart: "no"
+
+  sources-init:
+    build:
+      context: .
+    command: ["anxious-news-sources", "apply", "/app/sources.json"]
+    environment:
+      <<: *application-environment
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: "no"
+
+  bot:
+    build:
+      context: .
+    environment:
+      <<: *application-environment
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:?Set TELEGRAM_BOT_TOKEN in .env}
+    depends_on:
+      sources-init:
+        condition: service_completed_successfully
+    init: true
+    stdin_open: true
+    tty: true
+    restart: unless-stopped
+
+volumes:
+  postgres-data:

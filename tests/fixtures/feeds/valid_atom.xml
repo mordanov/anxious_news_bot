@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>Fixture Spain News</title>
+  <id>https://es.example/feed</id>
+  <updated>2026-08-12T14:00:00Z</updated>
+  <entry>
+    <title>Coastal park reopens</title>
+    <id>spain-001</id>
+    <link href="https://es.example/park" rel="alternate"/>
+    <updated>2026-08-12T14:00:00Z</updated>
+    <summary>The coastal park reopened after restoration work.</summary>
+  </entry>
+</feed>

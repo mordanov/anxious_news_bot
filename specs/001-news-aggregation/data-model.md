@@ -16,12 +16,18 @@ Configurable origin processed by the aggregator.
 | enabled | boolean | Defaults true |
 | quality_score | decimal | Optional, range 0.00–1.00 |
 | polling_interval_seconds | integer | Positive configured value |
+| last_polled_at | timestamp | Optional UTC time of most recent attempt |
+| next_poll_at | timestamp | Optional UTC due time; indexed with enabled state |
 | etag | text | Optional conditional-fetch value |
 | last_modified | text | Optional conditional-fetch value |
 | created_at / updated_at | timestamp | UTC |
 
 **Constraints**: Endpoint and source identity are unique according to configuration.
 Credentials are referenced from protected configuration, never stored in logs.
+Catalog imports update listed sources atomically by stable identifier and do not
+delete or disable omitted sources. Every completed fetch attempt sets
+`last_polled_at` and advances `next_poll_at` by the source polling interval,
+including failed attempts, so a failing source cannot create a tight retry loop.
 
 ## CollectionCycle
 
@@ -58,7 +64,7 @@ Source-specific result inside a cycle and the source failure-isolation boundary.
 
 ## SourceArticleRecord
 
-Immutable-enough provenance for one record observed from one source.
+Immutable provenance for one record observed during one source run.
 
 | Field | Type | Rules |
 |---|---|---|
@@ -74,7 +80,9 @@ Immutable-enough provenance for one record observed from one source.
 | rejection_code | text | Required only when rejected |
 | article_id | UUID | Optional reference to accepted NormalizedArticle |
 
-**Constraints**: Repeated source identity or payload hash is idempotent for a source.
+**Constraints**: Repeated source identity or payload hash is idempotent within a
+source run. A later run creates a new immutable observation while resolving the
+same source identity to its existing article.
 
 ## NormalizedArticle
 
@@ -96,9 +104,11 @@ Canonical general-news representation consumed by later modules.
 | topic_metadata | JSON | Validated general topics |
 | event_group_id | UUID | Optional reference to EventGroup |
 | created_in_cycle_id | UUID | Required reference to CollectionCycle |
+| post_processed_at | timestamp | Optional UTC completion marker for retry-safe consolidation/enrichment |
 
 **Constraints**: Canonical URL uniqueness is database-enforced. No user identifier,
-preference, interest score, or personalized rank is permitted.
+preference, interest score, or personalized rank is permitted. Articles without a
+post-processing completion marker are retried by a later cycle.
 
 ## DeduplicationDecision
 
@@ -113,7 +123,7 @@ Auditable comparison between two candidate articles.
 | title_similarity / content_similarity | decimal | Optional, range 0.00–1.00 |
 | threshold_configuration | JSON | Required values used for the decision |
 | normalization_version | text | Required |
-| evidence | JSON | Bounded, reviewable evidence |
+| evidence | JSON | Bounded signals, weights, window, anchor result, and reviewable evidence |
 | decided_at | timestamp | UTC |
 
 **Constraints**: Article pair is stored in deterministic identifier order and is
@@ -134,6 +144,8 @@ General-news event that may have coverage from multiple sources.
 
 Membership is represented by each article's optional `event_group_id`. Reassignment
 must retain a DeduplicationDecision or audit event explaining the change.
+Initial membership uses only the versioned deterministic event policy; optional
+validated enrichment may later propose an auditable reassignment.
 
 ## ArticleAnalysis
 
@@ -179,4 +191,3 @@ NormalizedArticle * ── * DeduplicationDecision (paired comparison)
   content; payload hashes and processing outcomes remain for audit.
 - Source and cycle diagnostics are bounded and sanitized.
 - Disabling a source does not delete its historical articles or provenance.
-

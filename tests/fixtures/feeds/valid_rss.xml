@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Fixture World News</title>
+    <link>https://news.example/</link>
+    <description>Deterministic RSS fixture</description>
+    <item>
+      <guid isPermaLink="false">world-001</guid>
+      <title>City opens a new public library</title>
+      <link>https://news.example/library?utm_source=fixture</link>
+      <description>A new library opened in the city center.</description>
+      <pubDate>Wed, 12 Aug 2026 12:00:00 GMT</pubDate>
+    </item>
+    <item>
+      <guid isPermaLink="false">world-002</guid>
+      <title>Regional rail service resumes</title>
+      <link>https://news.example/rail</link>
+      <description>Normal service resumed after scheduled maintenance.</description>
+      <pubDate>Wed, 12 Aug 2026 13:00:00 GMT</pubDate>
+    </item>
+  </channel>
+</rss>

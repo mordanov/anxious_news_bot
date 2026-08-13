@@ -9,22 +9,40 @@ description = "A minimal Telegram bot template for a personalized news applicati
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-    "python-telegram-bot>=21.6,<23",
+    "python-telegram-bot[job-queue]>=21.6,<23",
+    "SQLAlchemy>=2.0.36,<3",
+    "alembic>=1.14,<2",
+    "psycopg[binary]>=3.2,<4",
+    "httpx>=0.27,<1",
+    "feedparser>=6.0.11,<7",
+    "pydantic>=2.10,<3",
+    "tenacity>=8.5,<10",
 ]
 
 [project.optional-dependencies]
 dev = [
+    "bandit>=1.8,<2",
+    "pip-audit>=2.7,<3",
     "pytest>=8,<9",
     "pytest-asyncio>=0.24,<2",
+    "ruff>=0.9,<1",
 ]
 
 [project.scripts]
 anxious-news-bot = "anxious_news_bot.app:main"
+anxious-news-sources = "anxious_news_bot.news.cli:main"
 
 [tool.pytest.ini_options]
 addopts = "-q"
 asyncio_mode = "auto"
 testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 88
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I", "B"]
 
 [tool.setuptools.packages.find]
 where = ["src"]

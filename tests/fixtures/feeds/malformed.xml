@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Malformed Fixture</title>
+    <item>
+      <description>This entry has no required title or link.</description>
+    </item>
+    <item>
+      <title>Broken markup
+      <link>not a URL</link>
+    </item>
+  </channel>
+</rss>

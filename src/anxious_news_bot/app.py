@@ -3,7 +3,12 @@ from decimal import Decimal
 
 import httpx
 from telegram import Update
-from telegram.ext import Application, CommandHandler, ContextTypes
+from telegram.ext import (
+    Application,
+    CallbackQueryHandler,
+    CommandHandler,
+    ContextTypes,
+)
 
 from anxious_news_bot.config import Settings
 from anxious_news_bot.logging import configure_logging
@@ -23,6 +28,36 @@ from anxious_news_bot.news.services.source_catalog import (
     SourceAdapterRegistry,
     SourceAdapterRouter,
 )
+from anxious_news_bot.preferences.infrastructure.llm import (
+    StructuredPreferenceModelAdapter,
+)
+from anxious_news_bot.preferences.infrastructure.persistence import (
+    SQLAlchemyPreferenceRepository,
+)
+from anxious_news_bot.preferences.infrastructure.repository import (
+    SystemClock as PreferenceClock,
+)
+from anxious_news_bot.preferences.infrastructure.retention import (
+    PreferenceRetentionScheduler,
+)
+from anxious_news_bot.preferences.services.apply_changes import (
+    DeterministicPreferenceChangeValidator,
+)
+from anxious_news_bot.preferences.services.duplicates import (
+    PreferenceDuplicateDetector,
+)
+from anxious_news_bot.preferences.services.questionnaire_quality import (
+    DeterministicQuestionnaireQualityValidator,
+)
+from anxious_news_bot.preferences.services.repetition import (
+    SubstantialRepetitionDetector,
+)
+from anxious_news_bot.preferences.services.retention import (
+    PreferenceRetentionService,
+)
+from anxious_news_bot.preferences.services.tokens import SecureCallbackTokenFactory
+from anxious_news_bot.preferences.services.tune import PreferenceTuningService
+from anxious_news_bot.telegram.tune import CALLBACK_PREFIX, TuneTelegramAdapter
 
 LOGGER = logging.getLogger(__name__)
 START_MESSAGE = "The bot is running. News features will be added soon."
@@ -103,6 +138,46 @@ def build_application(settings: Settings) -> Application:
         max_concurrency=settings.news_max_concurrency,
         configuration_version=settings.news_url_policy_version,
     )
+    preference_repository = SQLAlchemyPreferenceRepository(
+        database,
+        history_context_limit=settings.preferences_history_question_limit,
+        duplicate_threshold=settings.preferences_duplicate_review_threshold,
+    )
+    preference_model = StructuredPreferenceModelAdapter(
+        client,
+        base_url=settings.preferences_model_base_url,
+        api_key=settings.preferences_model_api_key,
+        model=settings.preferences_model_name,
+        timeout_seconds=settings.preferences_model_timeout_seconds,
+        retry_attempts=settings.preferences_model_retry_attempts,
+        max_response_bytes=settings.preferences_model_max_response_bytes,
+    )
+    preference_clock = PreferenceClock()
+    tuning_service = PreferenceTuningService(
+        preference_repository,
+        preference_model,
+        DeterministicQuestionnaireQualityValidator(
+            repetition_threshold=settings.preferences_repetition_threshold
+        ),
+        DeterministicPreferenceChangeValidator(),
+        SecureCallbackTokenFactory(),
+        preference_clock,
+        duplicate_detector=PreferenceDuplicateDetector(
+            preference_model,
+            candidate_threshold=settings.preferences_duplicate_review_threshold,
+        ),
+        repetition_detector=SubstantialRepetitionDetector(
+            threshold=settings.preferences_repetition_threshold
+        ),
+    )
+    tune_adapter = TuneTelegramAdapter(tuning_service)
+    retention_service = PreferenceRetentionService(
+        preference_repository,
+        preference_clock,
+        questionnaire_days=settings.preferences_questionnaire_retention_days,
+        history_days=settings.preferences_change_history_retention_days,
+        batch_size=settings.preferences_retention_batch_size,
+    )
 
     async def post_init(application: Application) -> None:
         if application.job_queue is None:
@@ -114,11 +189,23 @@ def build_application(settings: Settings) -> Application:
         )
         application.bot_data["news_scheduler"] = scheduler
         scheduler.start()
+        retention_scheduler = PreferenceRetentionScheduler(
+            application.job_queue,
+            retention_service,
+            interval_seconds=settings.preferences_retention_scan_interval_seconds,
+        )
+        application.bot_data["preference_retention_scheduler"] = retention_scheduler
+        retention_scheduler.start()
 
     async def post_shutdown(application: Application) -> None:
         scheduler = application.bot_data.pop("news_scheduler", None)
         if scheduler is not None:
             scheduler.stop()
+        retention_scheduler = application.bot_data.pop(
+            "preference_retention_scheduler", None
+        )
+        if retention_scheduler is not None:
+            retention_scheduler.stop()
         await client.aclose()
         await database.close()
 
@@ -130,6 +217,13 @@ def build_application(settings: Settings) -> Application:
         .build()
     )
     application.add_handler(CommandHandler("start", start))
+    application.add_handler(CommandHandler("tune", tune_adapter.command))
+    application.add_handler(
+        CallbackQueryHandler(
+            tune_adapter.callback,
+            pattern=rf"^{CALLBACK_PREFIX}",
+        )
+    )
     application.add_error_handler(handle_error)
     return application
 

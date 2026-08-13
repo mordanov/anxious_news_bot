@@ -21,8 +21,9 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PostgreSQLUUID
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from anxious_news_bot.infrastructure.database import Base, TimestampMixin
 from anxious_news_bot.news.domain import (
     AnalysisStatus,
     CycleStatus,
@@ -41,22 +42,6 @@ def _enum(enum_class: type, name: str) -> Enum:
         name=name,
         values_callable=lambda members: [member.value for member in members],
         validate_strings=True,
-    )
-
-
-class Base(DeclarativeBase):
-    pass
-
-
-class TimestampMixin:
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, server_default=text("now()")
-    )
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        nullable=False,
-        server_default=text("now()"),
-        onupdate=lambda: datetime.now().astimezone(),
     )
 
 

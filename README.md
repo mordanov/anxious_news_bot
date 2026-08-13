@@ -45,6 +45,13 @@ PostgreSQL is intentionally available only inside the Compose network to avoid
 conflicting with a local server; use the `docker compose exec postgres psql ...`
 command below when you need a database console.
 
+Send `/tune` to create or resume a 10-question preference questionnaire. Each
+question has four opaque callback options. The profile is updated atomically only
+after all answers pass strict local validation. Configure an OpenAI-compatible
+structured-output endpoint with `PREFERENCES_MODEL_BASE_URL`,
+`PREFERENCES_MODEL_API_KEY`, and `PREFERENCES_MODEL_NAME`; all three are required
+together.
+
 Send `/start` to the bot in Telegram to test message handling. `docker exec` opens
 an additional process inside the running container; it does not replace Telegram
 as the bot's chat interface. Useful operational commands are:
@@ -81,6 +88,14 @@ Operational settings include:
 | `NEWS_NEAR_DUPLICATE_CONTENT_THRESHOLD` | `0.80` | Duplicate body threshold |
 | `NEWS_NEAR_DUPLICATE_REVIEW_THRESHOLD` | `0.72` | Manual-review boundary |
 | `NEWS_EVENT_WINDOW_HOURS` | `48` | Same-event candidate window |
+| `PREFERENCES_MODEL_TIMEOUT_SECONDS` | `30` | Model request timeout |
+| `PREFERENCES_MODEL_RETRY_ATTEMPTS` | `2` | Bounded model attempts |
+| `PREFERENCES_HISTORY_QUESTION_LIMIT` | `50` | Prior answers supplied as context |
+| `PREFERENCES_REPETITION_THRESHOLD` | `0.85` | Repeated-question rejection threshold |
+| `PREFERENCES_QUESTIONNAIRE_RETENTION_DAYS` | `365` | Detailed questionnaire retention |
+| `PREFERENCES_CHANGE_HISTORY_RETENTION_DAYS` | `0` | Full history retention; `0` keeps indefinitely |
+| `PREFERENCES_RETENTION_SCAN_INTERVAL_SECONDS` | `86400` | Cleanup cadence |
+| `PREFERENCES_RETENTION_BATCH_SIZE` | `500` | Maximum rows claimed per cleanup |
 
 Event weights and thresholds are configurable with the `NEWS_EVENT_*` variables
 defined in `src/anxious_news_bot/config.py`. Keep credentials out of committed
@@ -134,6 +149,12 @@ articles newly created during that cycle.
 Structured news diagnostics contain cycle/source/article identifiers, stage,
 status, bounded counts, and sanitized error context. Credentials, secret URL
 components, and raw article payloads are redacted.
+
+Preference diagnostics contain only stage, status, identifiers, bounded counts,
+and error categories. Question text, answers, callback tokens, credentials, and
+profile snapshots are never logged. Expired verbose preference history is deleted
+only when a matching immutable compact audit row exists for every change; compact
+identity and state/reason hashes remain indefinitely.
 
 ## Enrichment opt-in
 

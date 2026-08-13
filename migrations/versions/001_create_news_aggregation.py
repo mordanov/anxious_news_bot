@@ -4,12 +4,13 @@ Revision ID: 001_create_news_aggregation
 Revises:
 Create Date: 2026-08-12
 """
+
 from __future__ import annotations
 
 from collections.abc import Sequence
 
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 from sqlalchemy.dialects import postgresql
 
 revision: str = "001_create_news_aggregation"
@@ -17,9 +18,7 @@ down_revision: str | None = None
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
-source_type = postgresql.ENUM(
-    "rss", "atom", name="news_source_type", create_type=False
-)
+source_type = postgresql.ENUM("rss", "atom", name="news_source_type", create_type=False)
 cycle_status = postgresql.ENUM(
     "running",
     "completed",
@@ -131,9 +130,7 @@ def upgrade() -> None:
         sa.CheckConstraint(
             "endpoint_url ~ '^https?://'", name="ck_news_sources_endpoint"
         ),
-        sa.CheckConstraint(
-            "length(btrim(name)) > 0", name="ck_news_sources_name"
-        ),
+        sa.CheckConstraint("length(btrim(name)) > 0", name="ck_news_sources_name"),
         sa.CheckConstraint(
             "polling_interval_seconds > 0",
             name="ck_news_sources_polling_interval",
@@ -228,7 +225,9 @@ def upgrade() -> None:
         sa.Column("started_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("completed_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("error_code", sa.String(length=100), nullable=True),
-        sa.Column("error_context", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
+        sa.Column(
+            "error_context", postgresql.JSONB(astext_type=sa.Text()), nullable=True
+        ),
         sa.CheckConstraint(
             "completed_at IS NULL OR completed_at >= started_at",
             name="ck_source_runs_completion",
@@ -300,9 +299,7 @@ def upgrade() -> None:
         sa.Column("summary", sa.Text(), nullable=True),
         sa.Column("canonical_url", sa.Text(), nullable=False),
         sa.Column("canonicalization_version", sa.String(length=50), nullable=False),
-        sa.Column(
-            "primary_source_id", postgresql.UUID(as_uuid=True), nullable=False
-        ),
+        sa.Column("primary_source_id", postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column("published_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("ingested_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("language_code", sa.String(length=35), nullable=False),
@@ -320,9 +317,7 @@ def upgrade() -> None:
             nullable=False,
         ),
         sa.Column("event_group_id", postgresql.UUID(as_uuid=True), nullable=True),
-        sa.Column(
-            "created_in_cycle_id", postgresql.UUID(as_uuid=True), nullable=False
-        ),
+        sa.Column("created_in_cycle_id", postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column("post_processed_at", sa.DateTime(timezone=True), nullable=True),
         sa.CheckConstraint(
             "canonical_url ~ '^https?://'", name="ck_articles_canonical_url"
@@ -352,9 +347,7 @@ def upgrade() -> None:
         "normalized_articles",
         ["language_code", "published_at"],
     )
-    op.create_index(
-        "ix_articles_published_at", "normalized_articles", ["published_at"]
-    )
+    op.create_index("ix_articles_published_at", "normalized_articles", ["published_at"])
     op.create_index(
         "ix_articles_title_trgm",
         "normalized_articles",
@@ -385,7 +378,9 @@ def upgrade() -> None:
         sa.Column("source_id", postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column("external_id", sa.Text(), nullable=True),
         sa.Column("original_url", sa.Text(), nullable=False),
-        sa.Column("raw_payload", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
+        sa.Column(
+            "raw_payload", postgresql.JSONB(astext_type=sa.Text()), nullable=True
+        ),
         sa.Column("payload_hash", sa.String(length=64), nullable=False),
         sa.Column("observed_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("status", provenance_status, nullable=False),
@@ -433,9 +428,7 @@ def upgrade() -> None:
         sa.Column("right_article_id", postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column("decision_type", decision_type, nullable=False),
         sa.Column("outcome", decision_outcome, nullable=False),
-        sa.Column(
-            "title_similarity", sa.Numeric(precision=6, scale=5), nullable=True
-        ),
+        sa.Column("title_similarity", sa.Numeric(precision=6, scale=5), nullable=True),
         sa.Column(
             "content_similarity", sa.Numeric(precision=6, scale=5), nullable=True
         ),
@@ -445,9 +438,7 @@ def upgrade() -> None:
             nullable=False,
         ),
         sa.Column("normalization_version", sa.String(length=100), nullable=False),
-        sa.Column(
-            "evidence", postgresql.JSONB(astext_type=sa.Text()), nullable=False
-        ),
+        sa.Column("evidence", postgresql.JSONB(astext_type=sa.Text()), nullable=False),
         sa.Column("decided_at", sa.DateTime(timezone=True), nullable=False),
         sa.CheckConstraint(
             "content_similarity IS NULL OR "
@@ -559,8 +550,7 @@ def upgrade() -> None:
             name="ck_article_analyses_importance",
         ),
         sa.CheckConstraint(
-            "novelty_score IS NULL OR "
-            "(novelty_score >= 0 AND novelty_score <= 1)",
+            "novelty_score IS NULL OR (novelty_score >= 0 AND novelty_score <= 1)",
             name="ck_article_analyses_novelty",
         ),
         sa.CheckConstraint(

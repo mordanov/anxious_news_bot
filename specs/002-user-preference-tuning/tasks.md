@@ -22,9 +22,9 @@ and tested as a coherent increment.
 **Purpose**: Create the module layout and shared database boundary required by the
 feature without introducing a separate service.
 
-- [ ] T001 Create preference, service, infrastructure, and Telegram package initializers in src/anxious_news_bot/preferences/__init__.py, src/anxious_news_bot/preferences/services/__init__.py, src/anxious_news_bot/preferences/infrastructure/__init__.py, and src/anxious_news_bot/telegram/__init__.py
-- [ ] T002 Extract the reusable async Database, declarative Base, and timestamp mixin from the news module into src/anxious_news_bot/infrastructure/database.py and update imports in src/anxious_news_bot/news/infrastructure/database.py and src/anxious_news_bot/news/infrastructure/models.py
-- [ ] T003 Add validated model endpoint, timeout, retry, history-bound, question-quality, duplicate-threshold, questionnaire/history-retention, cleanup-cadence, and cleanup-batch settings in src/anxious_news_bot/config.py
+- [X] T001 Create preference, service, infrastructure, and Telegram package initializers in src/anxious_news_bot/preferences/__init__.py, src/anxious_news_bot/preferences/services/__init__.py, src/anxious_news_bot/preferences/infrastructure/__init__.py, and src/anxious_news_bot/telegram/__init__.py
+- [X] T002 Extract the reusable async Database, declarative Base, and timestamp mixin from the news module into src/anxious_news_bot/infrastructure/database.py and update imports in src/anxious_news_bot/news/infrastructure/database.py and src/anxious_news_bot/news/infrastructure/models.py
+- [X] T003 Add validated model endpoint, timeout, retry, history-bound, question-quality, duplicate-threshold, questionnaire/history-retention, cleanup-cadence, and cleanup-batch settings in src/anxious_news_bot/config.py
 
 ---
 
@@ -35,16 +35,16 @@ that all user stories use.
 
 **CRITICAL**: No user story work begins until this phase is complete.
 
-- [ ] T004 Define user, profile, parameter, questionnaire, question, option, answer, update-batch, full history, compact per-change audit, status, origin, and action domain values in src/anxious_news_bot/preferences/domain.py
-- [ ] T005 [P] Define generator, quality-validator, interpreter, equivalence-classifier, clock, token-factory, repository, and tuning-service protocols in src/anxious_news_bot/preferences/ports.py
-- [ ] T006 [P] Define strict frozen Pydantic questionnaire, option, change-union, equivalence, canonical decimal, and snapshot schemas in src/anxious_news_bot/preferences/schemas.py
-- [ ] T007 [P] Define typed generation, validation, answer, interpretation, stale-profile, proposal, and persistence errors in src/anxious_news_bot/preferences/errors.py
-- [ ] T008 Implement SQLAlchemy mappings, constraints, relationships, partial active-questionnaire uniqueness, callback-token lookup index, profile revisions, update-batch summaries, full history, and immutable compact per-change audit fields in src/anxious_news_bot/preferences/infrastructure/models.py
-- [ ] T009 Create the Alembic migration for application users, profiles, parameters, questionnaires, questions, options, answers, update batches, full history, and immutable compact per-change audit rows in migrations/versions/002_create_user_preferences.py
-- [ ] T010 Implement the async preference repository unit-of-work skeleton and domain/ORM mappings in src/anxious_news_bot/preferences/infrastructure/persistence.py
-- [ ] T011 [P] Add sanitized preference-stage structured logging helpers that exclude question text, answers, tokens, credentials, and profile snapshots in src/anxious_news_bot/preferences/observability.py
-- [ ] T012 [P] Add deterministic fake generator, interpreter, equivalence classifier, clock, and callback-token fixtures in tests/fixtures/preferences.py
-- [ ] T013 Add PostgreSQL migration, constraint, relationship, partial-unique-index, and weight-range integration tests in tests/integration/preferences/test_models.py
+- [X] T004 Define user, profile, parameter, questionnaire, question, option, answer, update-batch, full history, compact per-change audit, status, origin, and action domain values in src/anxious_news_bot/preferences/domain.py
+- [X] T005 [P] Define generator, quality-validator, interpreter, equivalence-classifier, clock, token-factory, repository, and tuning-service protocols in src/anxious_news_bot/preferences/ports.py
+- [X] T006 [P] Define strict frozen Pydantic questionnaire, option, change-union, equivalence, canonical decimal, and snapshot schemas in src/anxious_news_bot/preferences/schemas.py
+- [X] T007 [P] Define typed generation, validation, answer, interpretation, stale-profile, proposal, and persistence errors in src/anxious_news_bot/preferences/errors.py
+- [X] T008 Implement SQLAlchemy mappings, constraints, relationships, partial active-questionnaire uniqueness, callback-token lookup index, profile revisions, update-batch summaries, full history, and immutable compact per-change audit fields in src/anxious_news_bot/preferences/infrastructure/models.py
+- [X] T009 Create the Alembic migration for application users, profiles, parameters, questionnaires, questions, options, answers, update batches, full history, and immutable compact per-change audit rows in migrations/versions/002_create_user_preferences.py
+- [X] T010 Implement the async preference repository unit-of-work skeleton and domain/ORM mappings in src/anxious_news_bot/preferences/infrastructure/persistence.py
+- [X] T011 [P] Add sanitized preference-stage structured logging helpers that exclude question text, answers, tokens, credentials, and profile snapshots in src/anxious_news_bot/preferences/observability.py
+- [X] T012 [P] Add deterministic fake generator, interpreter, equivalence classifier, clock, and callback-token fixtures in tests/fixtures/preferences.py
+- [X] T013 Add PostgreSQL migration, constraint, relationship, partial-unique-index, and weight-range integration tests in tests/integration/preferences/test_models.py
 
 **Checkpoint**: Shared domain, contracts, storage, and test doubles are ready.
 
@@ -61,22 +61,22 @@ update while duplicate callbacks do not advance twice.
 
 ### Tests for User Story 1
 
-- [ ] T014 [P] [US1] Add strict questionnaire contract tests for 10 questions, four unique ordered options, extra fields, ordinals, lengths, and malformed types in tests/unit/preferences/test_questionnaire_schemas.py
-- [ ] T015 [P] [US1] Add question-quality tests for concrete single-dimension wording, disguised yes/no, leading, vague, irrelevant, double-barreled, and duplicate questions in tests/unit/preferences/test_questionnaire_quality.py
-- [ ] T016 [P] [US1] Add tuning-service tests for create, active-session resume, answers 1–9 without profile mutation, answer 10 interpretation/application, provider failure, and deterministic state rendering in tests/unit/preferences/test_tune.py
-- [ ] T017 [P] [US1] Add repository integration tests for one active questionnaire, atomic 10-question/40-option storage, current-option ownership, duplicate callback replay, raced options, and restart/resume in tests/integration/preferences/test_questionnaires.py
-- [ ] T018 [P] [US1] Add Telegram adapter tests for `/tune`, four-button rendering, prompt callback acknowledgement, opaque callback shape, stale options, missing users/messages, and controlled failures in tests/unit/telegram/test_tune.py
+- [X] T014 [P] [US1] Add strict questionnaire contract tests for 10 questions, four unique ordered options, extra fields, ordinals, lengths, and malformed types in tests/unit/preferences/test_questionnaire_schemas.py
+- [X] T015 [P] [US1] Add question-quality tests for concrete single-dimension wording, disguised yes/no, leading, vague, irrelevant, double-barreled, and duplicate questions in tests/unit/preferences/test_questionnaire_quality.py
+- [X] T016 [P] [US1] Add tuning-service tests for create, active-session resume, answers 1–9 without profile mutation, answer 10 interpretation/application, provider failure, and deterministic state rendering in tests/unit/preferences/test_tune.py
+- [X] T017 [P] [US1] Add repository integration tests for one active questionnaire, atomic 10-question/40-option storage, current-option ownership, duplicate callback replay, raced options, and restart/resume in tests/integration/preferences/test_questionnaires.py
+- [X] T018 [P] [US1] Add Telegram adapter tests for `/tune`, four-button rendering, prompt callback acknowledgement, opaque callback shape, stale options, missing users/messages, and controlled failures in tests/unit/telegram/test_tune.py
 
 ### Implementation for User Story 1
 
-- [ ] T019 [P] [US1] Implement deterministic questionnaire structural and question-quality validation in src/anxious_news_bot/preferences/services/questionnaire_quality.py
-- [ ] T020 [P] [US1] Implement bounded opaque callback-token generation and hashing in src/anxious_news_bot/preferences/services/tokens.py
-- [ ] T021 [US1] Implement user/profile resolution, active questionnaire claims, atomic question storage, token resolution, idempotent answers, and tune-state reads in src/anxious_news_bot/preferences/infrastructure/persistence.py
-- [ ] T022 [US1] Implement the provider-neutral HTTPX structured-output generator and interpreter adapter with bounded retries and response sizes in src/anxious_news_bot/preferences/infrastructure/llm.py
-- [ ] T023 [US1] Implement minimal validated create/adjust proposal application after exactly 10 answers, preserving exact weights and questionnaire origin in src/anxious_news_bot/preferences/services/apply_changes.py
-- [ ] T024 [US1] Implement start/resume and answer orchestration without holding transactions during model calls in src/anxious_news_bot/preferences/services/tune.py
-- [ ] T025 [US1] Implement thin `/tune` command, opaque callback handler, and TuneState rendering in src/anxious_news_bot/telegram/tune.py
-- [ ] T026 [US1] Wire the preference repository, model adapters, tuning service, `/tune` command, callback handler, and shared-client shutdown into src/anxious_news_bot/app.py
+- [X] T019 [P] [US1] Implement deterministic questionnaire structural and question-quality validation in src/anxious_news_bot/preferences/services/questionnaire_quality.py
+- [X] T020 [P] [US1] Implement bounded opaque callback-token generation and hashing in src/anxious_news_bot/preferences/services/tokens.py
+- [X] T021 [US1] Implement user/profile resolution, active questionnaire claims, atomic question storage, token resolution, idempotent answers, and tune-state reads in src/anxious_news_bot/preferences/infrastructure/persistence.py
+- [X] T022 [US1] Implement the provider-neutral HTTPX structured-output generator and interpreter adapter with bounded retries and response sizes in src/anxious_news_bot/preferences/infrastructure/llm.py
+- [X] T023 [US1] Implement minimal validated create/adjust proposal application after exactly 10 answers, preserving exact weights and questionnaire origin in src/anxious_news_bot/preferences/services/apply_changes.py
+- [X] T024 [US1] Implement start/resume and answer orchestration without holding transactions during model calls in src/anxious_news_bot/preferences/services/tune.py
+- [X] T025 [US1] Implement thin `/tune` command, opaque callback handler, and TuneState rendering in src/anxious_news_bot/telegram/tune.py
+- [X] T026 [US1] Wire the preference repository, model adapters, tuning service, `/tune` command, callback handler, and shared-client shutdown into src/anxious_news_bot/app.py
 
 **Checkpoint**: User Story 1 is a complete restart-safe MVP.
 
@@ -94,19 +94,19 @@ duplicate.
 
 ### Tests for User Story 2
 
-- [ ] T027 [P] [US2] Add adaptive-context tests for relevant history bounds, unexplored dimensions, strong interests, ambiguous preferences, language, and user isolation in tests/unit/preferences/test_context.py
-- [ ] T028 [P] [US2] Add repetition tests across consecutive questionnaires, including allowed ambiguity clarification and normalized paraphrase fixtures, in tests/unit/preferences/test_repetition.py
-- [ ] T029 [P] [US2] Add semantic-key, exact, trigram-candidate, inactive-parameter reuse, and equivalence-classifier duplicate tests in tests/unit/preferences/test_duplicates.py
-- [ ] T030 [P] [US2] Add PostgreSQL history-selection and per-user duplicate-candidate integration tests in tests/integration/preferences/test_context_and_duplicates.py
+- [X] T027 [P] [US2] Add adaptive-context tests for relevant history bounds, unexplored dimensions, strong interests, ambiguous preferences, language, and user isolation in tests/unit/preferences/test_context.py
+- [X] T028 [P] [US2] Add repetition tests across consecutive questionnaires, including allowed ambiguity clarification and normalized paraphrase fixtures, in tests/unit/preferences/test_repetition.py
+- [X] T029 [P] [US2] Add semantic-key, exact, trigram-candidate, inactive-parameter reuse, and equivalence-classifier duplicate tests in tests/unit/preferences/test_duplicates.py
+- [X] T030 [P] [US2] Add PostgreSQL history-selection and per-user duplicate-candidate integration tests in tests/integration/preferences/test_context_and_duplicates.py
 
 ### Implementation for User Story 2
 
-- [ ] T031 [P] [US2] Implement bounded adaptive context selection and dimension classification in src/anxious_news_bot/preferences/services/context.py
-- [ ] T032 [P] [US2] Implement normalized substantial-repetition comparison and allowed-clarification evidence in src/anxious_news_bot/preferences/services/repetition.py
-- [ ] T033 [US2] Implement semantic-key normalization, PostgreSQL trigram candidate handling, and strict read-only equivalence classification in src/anxious_news_bot/preferences/services/duplicates.py
-- [ ] T034 [US2] Extend questionnaire context queries, inactive-parameter lookup, and duplicate-candidate retrieval in src/anxious_news_bot/preferences/infrastructure/persistence.py
-- [ ] T035 [US2] Extend generation and interpretation request construction with bounded prior context and existing-parameter reuse instructions in src/anxious_news_bot/preferences/infrastructure/llm.py
-- [ ] T036 [US2] Integrate adaptive context, repetition validation, and reuse/refinement outcomes into src/anxious_news_bot/preferences/services/tune.py
+- [X] T031 [P] [US2] Implement bounded adaptive context selection and dimension classification in src/anxious_news_bot/preferences/services/context.py
+- [X] T032 [P] [US2] Implement normalized substantial-repetition comparison and allowed-clarification evidence in src/anxious_news_bot/preferences/services/repetition.py
+- [X] T033 [US2] Implement semantic-key normalization, PostgreSQL trigram candidate handling, and strict read-only equivalence classification in src/anxious_news_bot/preferences/services/duplicates.py
+- [X] T034 [US2] Extend questionnaire context queries, inactive-parameter lookup, and duplicate-candidate retrieval in src/anxious_news_bot/preferences/infrastructure/persistence.py
+- [X] T035 [US2] Extend generation and interpretation request construction with bounded prior context and existing-parameter reuse instructions in src/anxious_news_bot/preferences/infrastructure/llm.py
+- [X] T036 [US2] Integrate adaptive context, repetition validation, and reuse/refinement outcomes into src/anxious_news_bot/preferences/services/tune.py
 
 **Checkpoint**: User Story 2 improves profiles incrementally without substantial
 question or parameter duplication.
@@ -125,18 +125,18 @@ every applied change has full audit evidence.
 
 ### Tests for User Story 3
 
-- [ ] T037 [P] [US3] Add strict discriminated change-contract tests for actions, required fields, unknown IDs, duplicate targets, canonical decimal strings, boundaries, negative zero, exponent notation, precision, and range in tests/unit/preferences/test_change_schemas.py
-- [ ] T038 [P] [US3] Add deterministic proposal-validation and application tests for create, adjust, refine, deactivate, reactivate, unchanged actions, and stable normalized hashes in tests/unit/preferences/test_apply_changes.py
-- [ ] T039 [P] [US3] Add PostgreSQL atomic rollback tests with failure injection after profile, parameter, full-history, compact-audit, batch, and questionnaire writes in tests/integration/preferences/test_atomic_application.py
-- [ ] T040 [P] [US3] Add concurrent revision-CAS, stale interpretation, repeated questionnaire, and identical-input determinism integration tests in tests/integration/preferences/test_application_concurrency.py
-- [ ] T041 [P] [US3] Add full-history reconstruction plus compact per-change hash/identity and append-only constraint tests for every applied action in tests/integration/preferences/test_history.py
+- [X] T037 [P] [US3] Add strict discriminated change-contract tests for actions, required fields, unknown IDs, duplicate targets, canonical decimal strings, boundaries, negative zero, exponent notation, precision, and range in tests/unit/preferences/test_change_schemas.py
+- [X] T038 [P] [US3] Add deterministic proposal-validation and application tests for create, adjust, refine, deactivate, reactivate, unchanged actions, and stable normalized hashes in tests/unit/preferences/test_apply_changes.py
+- [X] T039 [P] [US3] Add PostgreSQL atomic rollback tests with failure injection after profile, parameter, full-history, compact-audit, batch, and questionnaire writes in tests/integration/preferences/test_atomic_application.py
+- [X] T040 [P] [US3] Add concurrent revision-CAS, stale interpretation, repeated questionnaire, and identical-input determinism integration tests in tests/integration/preferences/test_application_concurrency.py
+- [X] T041 [P] [US3] Add full-history reconstruction plus compact per-change hash/identity and append-only constraint tests for every applied action in tests/integration/preferences/test_history.py
 
 ### Implementation for User Story 3
 
-- [ ] T042 [US3] Complete normalized proposal validation, exact Decimal handling, supported-action semantics, duplicate-target rejection, and deterministic proposal hashing in src/anxious_news_bot/preferences/services/apply_changes.py
-- [ ] T043 [US3] Implement one-transaction questionnaire claim, profile revision compare-and-swap, parameter mutation, immutable before/after history, matching compact per-change audit rows, batch completion, rollback, and replay resolution in src/anxious_news_bot/preferences/infrastructure/persistence.py
-- [ ] T044 [US3] Implement stale-profile re-interpretation, typed invalid-batch outcomes, retry boundaries, and deterministic completion handling in src/anxious_news_bot/preferences/services/tune.py
-- [ ] T045 [US3] Emit sanitized generation, answer, interpretation, validation, stale, apply, and failure events through src/anxious_news_bot/preferences/observability.py
+- [X] T042 [US3] Complete normalized proposal validation, exact Decimal handling, supported-action semantics, duplicate-target rejection, and deterministic proposal hashing in src/anxious_news_bot/preferences/services/apply_changes.py
+- [X] T043 [US3] Implement one-transaction questionnaire claim, profile revision compare-and-swap, parameter mutation, immutable before/after history, matching compact per-change audit rows, batch completion, rollback, and replay resolution in src/anxious_news_bot/preferences/infrastructure/persistence.py
+- [X] T044 [US3] Implement stale-profile re-interpretation, typed invalid-batch outcomes, retry boundaries, and deterministic completion handling in src/anxious_news_bot/preferences/services/tune.py
+- [X] T045 [US3] Emit sanitized generation, answer, interpretation, validation, stale, apply, and failure events through src/anxious_news_bot/preferences/observability.py
 
 **Checkpoint**: User Story 3 makes profile state trustworthy and auditable under
 invalid output, failure, replay, and concurrency.
@@ -154,13 +154,13 @@ and any forbidden explicit-preference action rejects the whole batch.
 
 ### Tests for User Story 4
 
-- [ ] T046 [P] [US4] Add action-by-origin policy unit tests proving questionnaire create origin, allowed questionnaire-target actions, rejected explicit/inference/system adjust (including strengthen), refine, deactivate, reactivate, equivalent create, and mixed-batch atomic rejection in tests/unit/preferences/test_explicit_authority.py
-- [ ] T047 [P] [US4] Add PostgreSQL tests proving origin immutability, questionnaire history source separation, protected-parameter non-mutation, equivalent-create rejection, distinct narrower creation, and forbidden mixed-batch atomicity in tests/integration/preferences/test_explicit_authority.py
+- [X] T046 [P] [US4] Add action-by-origin policy unit tests proving questionnaire create origin, allowed questionnaire-target actions, rejected explicit/inference/system adjust (including strengthen), refine, deactivate, reactivate, equivalent create, and mixed-batch atomic rejection in tests/unit/preferences/test_explicit_authority.py
+- [X] T047 [P] [US4] Add PostgreSQL tests proving origin immutability, questionnaire history source separation, protected-parameter non-mutation, equivalent-create rejection, distinct narrower creation, and forbidden mixed-batch atomicity in tests/integration/preferences/test_explicit_authority.py
 
 ### Implementation for User Story 4
 
-- [ ] T048 [US4] Implement the action-by-origin matrix, immutable origins, questionnaire-only target mutation, protected equivalent-create rejection, distinct narrower creation, and whole-batch failure in src/anxious_news_bot/preferences/services/apply_changes.py
-- [ ] T049 [US4] Include immutable origin and specificity evidence in interpretation context and instruct proposals to target only questionnaire-origin parameters without accepting generated origin values in src/anxious_news_bot/preferences/infrastructure/llm.py
+- [X] T048 [US4] Implement the action-by-origin matrix, immutable origins, questionnaire-only target mutation, protected equivalent-create rejection, distinct narrower creation, and whole-batch failure in src/anxious_news_bot/preferences/services/apply_changes.py
+- [X] T049 [US4] Include immutable origin and specificity evidence in interpretation context and instruct proposals to target only questionnaire-origin parameters without accepting generated origin values in src/anxious_news_bot/preferences/infrastructure/llm.py
 
 **Checkpoint**: All four user stories are independently testable and preserve user
 authority.
@@ -172,18 +172,18 @@ authority.
 **Purpose**: Enforce measurable quality, performance, privacy, documentation, and
 full-system acceptance criteria.
 
-- [ ] T050 [P] Add reviewed questionnaire-quality and consecutive-session repetition fixtures with enforced SC-002 and SC-005 thresholds in tests/fixtures/preference_quality_cases.py and tests/integration/preferences/test_questionnaire_quality_metrics.py
-- [ ] T051 [P] Add reviewed semantic-equivalence fixtures with enforced SC-010 recall and exact-match guarantees in tests/fixtures/preference_duplicate_cases.py and tests/integration/preferences/test_duplicate_quality_metrics.py
-- [ ] T052 [P] Add answer-state and post-interpretation latency checks for the plan and SC-004 targets in tests/integration/preferences/test_tune_performance.py
-- [ ] T053 [P] Add structured-log redaction tests for credentials, callback tokens, question/answer text, and profile snapshots in tests/unit/preferences/test_observability.py
-- [ ] T054 [P] Add retention configuration, cutoff, disabled-history-cleanup, batch-bound, active-session exclusion, and result-count unit tests in tests/unit/preferences/test_retention.py
-- [ ] T055 [P] Add PostgreSQL retention tests for applied/failed/active questionnaires, current parameters, bounded and repeated cleanup, full-history expiry, immutable compact per-change survival, hash/identity auditability, missing-audit deletion refusal, and preserved batch digests in tests/integration/preferences/test_retention.py
-- [ ] T056 Implement deterministic retention cutoffs, disabled-history semantics, and bounded cleanup orchestration in src/anxious_news_bot/preferences/services/retention.py
-- [ ] T057 Implement claimed-batch questionnaire-detail and full-history cleanup that requires and preserves matching immutable compact per-change audit rows and update-batch digests in src/anxious_news_bot/preferences/infrastructure/persistence.py
-- [ ] T058 Register configurable recurring retention cleanup outside Telegram handlers with overlap-safe outcomes in src/anxious_news_bot/preferences/infrastructure/retention.py and src/anxious_news_bot/app.py
-- [ ] T059 Update configuration, retention, migration, `/tune`, model-provider, privacy, and test instructions in README.md and docker-compose.yml
-- [ ] T060 Execute every acceptance scenario from specs/002-user-preference-tuning/quickstart.md and record the verified commands and outcomes in specs/002-user-preference-tuning/quickstart.md
-- [ ] T061 Run the full pytest, Ruff format/lint, Bandit, pip-audit, Alembic upgrade, and Docker Compose startup gates defined in .github/workflows/ci.yml and docker-compose.yml
+- [X] T050 [P] Add reviewed questionnaire-quality and consecutive-session repetition fixtures with enforced SC-002 and SC-005 thresholds in tests/fixtures/preference_quality_cases.py and tests/integration/preferences/test_questionnaire_quality_metrics.py
+- [X] T051 [P] Add reviewed semantic-equivalence fixtures with enforced SC-010 recall and exact-match guarantees in tests/fixtures/preference_duplicate_cases.py and tests/integration/preferences/test_duplicate_quality_metrics.py
+- [X] T052 [P] Add answer-state and post-interpretation latency checks for the plan and SC-004 targets in tests/integration/preferences/test_tune_performance.py
+- [X] T053 [P] Add structured-log redaction tests for credentials, callback tokens, question/answer text, and profile snapshots in tests/unit/preferences/test_observability.py
+- [X] T054 [P] Add retention configuration, cutoff, disabled-history-cleanup, batch-bound, active-session exclusion, and result-count unit tests in tests/unit/preferences/test_retention.py
+- [X] T055 [P] Add PostgreSQL retention tests for applied/failed/active questionnaires, current parameters, bounded and repeated cleanup, full-history expiry, immutable compact per-change survival, hash/identity auditability, missing-audit deletion refusal, and preserved batch digests in tests/integration/preferences/test_retention.py
+- [X] T056 Implement deterministic retention cutoffs, disabled-history semantics, and bounded cleanup orchestration in src/anxious_news_bot/preferences/services/retention.py
+- [X] T057 Implement claimed-batch questionnaire-detail and full-history cleanup that requires and preserves matching immutable compact per-change audit rows and update-batch digests in src/anxious_news_bot/preferences/infrastructure/persistence.py
+- [X] T058 Register configurable recurring retention cleanup outside Telegram handlers with overlap-safe outcomes in src/anxious_news_bot/preferences/infrastructure/retention.py and src/anxious_news_bot/app.py
+- [X] T059 Update configuration, retention, migration, `/tune`, model-provider, privacy, and test instructions in README.md and docker-compose.yml
+- [X] T060 Execute every acceptance scenario from specs/002-user-preference-tuning/quickstart.md and record the verified commands and outcomes in specs/002-user-preference-tuning/quickstart.md
+- [X] T061 Run the full pytest, Ruff format/lint, Bandit, pip-audit, Alembic upgrade, and Docker Compose startup gates defined in .github/workflows/ci.yml and docker-compose.yml
 
 ---
 

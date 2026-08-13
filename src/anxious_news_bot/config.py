@@ -97,6 +97,19 @@ class Settings:
     news_event_anchor_threshold: float = 0.55
     news_event_assignment_threshold: float = 0.62
     news_event_review_threshold: float = 0.52
+    preferences_model_base_url: str = ""
+    preferences_model_api_key: str = ""
+    preferences_model_name: str = ""
+    preferences_model_timeout_seconds: float = 30.0
+    preferences_model_retry_attempts: int = 2
+    preferences_model_max_response_bytes: int = 262_144
+    preferences_history_question_limit: int = 50
+    preferences_duplicate_review_threshold: float = 0.72
+    preferences_repetition_threshold: float = 0.85
+    preferences_questionnaire_retention_days: int = 365
+    preferences_change_history_retention_days: int = 0
+    preferences_retention_scan_interval_seconds: int = 86_400
+    preferences_retention_batch_size: int = 500
 
     @classmethod
     def from_env(cls) -> Settings:
@@ -154,6 +167,42 @@ class Settings:
                 "NEWS_EVENT_ASSIGNMENT_THRESHOLD", 0.62
             ),
             news_event_review_threshold=_threshold("NEWS_EVENT_REVIEW_THRESHOLD", 0.52),
+            preferences_model_base_url=_text("PREFERENCES_MODEL_BASE_URL"),
+            preferences_model_api_key=_text("PREFERENCES_MODEL_API_KEY"),
+            preferences_model_name=_text("PREFERENCES_MODEL_NAME"),
+            preferences_model_timeout_seconds=_number(
+                "PREFERENCES_MODEL_TIMEOUT_SECONDS",
+                30.0,
+                minimum=0.0,
+                inclusive_minimum=False,
+            ),
+            preferences_model_retry_attempts=_integer(
+                "PREFERENCES_MODEL_RETRY_ATTEMPTS", 2
+            ),
+            preferences_model_max_response_bytes=_integer(
+                "PREFERENCES_MODEL_MAX_RESPONSE_BYTES", 262_144
+            ),
+            preferences_history_question_limit=_integer(
+                "PREFERENCES_HISTORY_QUESTION_LIMIT", 50
+            ),
+            preferences_duplicate_review_threshold=_threshold(
+                "PREFERENCES_DUPLICATE_REVIEW_THRESHOLD", 0.72
+            ),
+            preferences_repetition_threshold=_threshold(
+                "PREFERENCES_REPETITION_THRESHOLD", 0.85
+            ),
+            preferences_questionnaire_retention_days=_integer(
+                "PREFERENCES_QUESTIONNAIRE_RETENTION_DAYS", 365, minimum=0
+            ),
+            preferences_change_history_retention_days=_integer(
+                "PREFERENCES_CHANGE_HISTORY_RETENTION_DAYS", 0, minimum=0
+            ),
+            preferences_retention_scan_interval_seconds=_integer(
+                "PREFERENCES_RETENTION_SCAN_INTERVAL_SECONDS", 86_400
+            ),
+            preferences_retention_batch_size=_integer(
+                "PREFERENCES_RETENTION_BATCH_SIZE", 500
+            ),
         )
         settings._validate()
         return settings
@@ -184,3 +233,17 @@ class Settings:
                 "NEWS_EVENT_REVIEW_THRESHOLD must be lower than "
                 "NEWS_EVENT_ASSIGNMENT_THRESHOLD"
             )
+        model_values = (
+            self.preferences_model_base_url,
+            self.preferences_model_api_key,
+            self.preferences_model_name,
+        )
+        if any(model_values) and not all(model_values):
+            raise RuntimeError(
+                "PREFERENCES_MODEL_BASE_URL, PREFERENCES_MODEL_API_KEY, and "
+                "PREFERENCES_MODEL_NAME must be configured together"
+            )
+        if self.preferences_model_base_url:
+            parsed = urlsplit(self.preferences_model_base_url)
+            if parsed.scheme != "https" or not parsed.netloc:
+                raise RuntimeError("PREFERENCES_MODEL_BASE_URL must be an HTTPS URL")

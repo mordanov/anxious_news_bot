@@ -113,3 +113,38 @@ Users can complete and resume adaptive 10-question sessions. Accepted model outp
 passes strict structural and semantic validation before one deterministic atomic
 update. Invalid, stale, duplicate, replayed, or concurrent input leaves the
 previous profile intact, and every applied change is auditable.
+
+## Verification record
+
+Verified on 2026-08-13 with the project virtual environment:
+
+```text
+python -m pytest
+180 passed
+
+python -m ruff format --check src tests docker migrations
+114 files already formatted
+
+python -m ruff check src tests docker migrations
+All checks passed
+
+python -m bandit --quiet --recursive src docker
+No findings
+
+python -m pip_audit . --strict --progress-spinner off
+No known vulnerabilities found
+
+python -m alembic heads
+002_create_user_preferences (head)
+
+docker-compose config --quiet
+Configuration valid
+```
+
+The automated acceptance suite uses PostgreSQL and covers session creation,
+10-question/40-option persistence, restart/resume, callback ownership and replay,
+strict output contracts, exact decimals, bounded adaptive context, repetition and
+duplicate rejection, profile revision conflicts, protected origins, atomic
+rollback, full and compact audit linkage, append-only audit enforcement, cleanup
+integrity, and latency bounds. Live Telegram and provider calls remain manual by
+design; HTTP adapter tests use `httpx.MockTransport`.

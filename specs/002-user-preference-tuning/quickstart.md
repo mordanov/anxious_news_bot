@@ -32,6 +32,10 @@ export PREFERENCES_MODEL_TIMEOUT_SECONDS='30'
 export PREFERENCES_MODEL_RETRY_ATTEMPTS='2'
 export PREFERENCES_HISTORY_QUESTION_LIMIT='50'
 export PREFERENCES_DUPLICATE_REVIEW_THRESHOLD='0.72'
+export PREFERENCES_QUESTIONNAIRE_RETENTION_DAYS='365'
+export PREFERENCES_CHANGE_HISTORY_RETENTION_DAYS='0'
+export PREFERENCES_RETENTION_SCAN_INTERVAL_SECONDS='86400'
+export PREFERENCES_RETENTION_BATCH_SIZE='500'
 ```
 
 Do not commit credentials. Model configuration is optional for automated tests
@@ -75,8 +79,9 @@ services.
    zero, and out-of-range values.
 8. Propose an exact-key, lexical, and paraphrased duplicate and confirm creation is
    rejected or redirected to reuse/refinement.
-9. Propose weakening or generalizing an explicit preference and confirm the entire
-   batch is rejected.
+9. Propose adjusting (including strengthening), refining, deactivating, or
+   reactivating explicit, inference, and system parameters; confirm every entire
+   batch is rejected and all protected parameters remain unchanged.
 10. Inject malformed generation, malformed interpretation, and a database failure
     after each application write; confirm the prior profile remains unchanged.
 11. Apply the same questionnaire concurrently twice and confirm it changes the
@@ -87,6 +92,20 @@ services.
     options; confirm no unauthorized or duplicate answer is recorded.
 14. Inspect structured logs and confirm they contain no credentials, callback
     tokens, question/answer text, or full profile snapshots.
+15. Set short retention periods, create expired applied and failed questionnaires,
+    run one cleanup tick, and confirm no more than the configured batch is removed.
+16. Confirm active questionnaires and current parameters are unchanged, failed
+    expired sessions are removed, applied sessions retain questionnaire/batch
+    identities and audit digests, every applied change retains its compact audit
+    row, and full history remains when its retention is `0`.
+17. Enable positive full-history retention, expire detailed change rows, and
+    confirm each removed row still has an immutable compact record with parameter,
+    action, source, questionnaire/batch, timestamp, and previous/new/reason hashes.
+    Confirm cleanup refuses deletion when a matching compact record is absent.
+18. Propose an equivalent create beside a protected parameter and confirm no
+    duplicate is created; then propose a genuinely narrower distinct dimension and
+    confirm it creates a questionnaire-origin parameter without changing the
+    protected parameter.
 
 ## Expected result
 

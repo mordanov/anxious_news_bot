@@ -62,8 +62,11 @@ tokens, and stores all 10 questions and 40 options atomically.
 - MUST NOT persist or receive a repository.
 
 Application validation rejects unknown IDs, duplicate targets, invalid weights,
-unsupported actions, semantic duplicates, and forbidden explicit-preference
-changes before constructing an update batch.
+unsupported actions, semantic duplicates, and every questionnaire action targeting
+an explicit, inference, or system parameter before constructing an update batch.
+Create actions receive questionnaire origin from application code. Equivalent
+protected parameters reject creation; only a distinct semantic key may create a
+separate questionnaire-origin parameter.
 
 ## PreferenceEquivalenceClassifier
 
@@ -93,6 +96,9 @@ The repository contract provides:
 - load bounded relevant prior questionnaire context;
 - retrieve duplicate candidates for a proposed parameter;
 - atomically apply a validated update batch against an expected profile revision;
+- claim and purge a bounded batch of expired terminal questionnaire details;
+- claim and purge a bounded batch of expired full change-history rows only after
+  verifying a matching immutable compact audit row exists for every detailed row;
 - return the persisted tune state after conflicts or retries.
 
 The implementation MUST use independent sessions per application operation and
@@ -121,6 +127,24 @@ MUST NOT keep a transaction open during model calls.
 6. Apply it atomically against the captured profile revision.
 7. Return completed, retryable processing, stale-profile reprocessing, or failed
    state without partial preference changes.
+
+## PreferenceRetentionService
+
+`purge_expired(now) -> RetentionResult`
+
+1. Derive questionnaire and full-history cutoffs from validated configuration.
+2. Claim at most the configured batch size of eligible terminal records.
+3. Remove expired details without touching active questionnaires, current
+   parameters, questionnaire/update-batch identity, update-batch digest, or any
+   compact per-change audit row.
+4. Commit one bounded transaction and return examined, removed, and preserved
+   counts by data class.
+
+The service runs on a configurable application schedule outside Telegram handlers.
+An overlapping or repeated tick is a safe no-op for already claimed or removed
+records. A zero full-history retention value means history cleanup is disabled.
+Missing compact evidence blocks deletion and produces a typed retention-integrity
+failure rather than weakening auditability.
 
 ## Telegram adapter
 

@@ -12,7 +12,8 @@ for later sessions. Provider-neutral model adapters return strict versioned
 questionnaire and change-proposal documents; application services validate them,
 prevent semantic duplicates, and atomically apply deterministic incremental
 changes against a profile revision. Exact decimal weights, idempotent callbacks,
-and before/after history preserve profile integrity and auditability.
+full before/after history, and immutable compact per-change audit evidence preserve
+profile integrity and auditability.
 
 ## Technical Context
 
@@ -32,9 +33,12 @@ bounded by one user
 **Constraints**: Exactly 10 questions and four options; weights use exact
 two-decimal values in `[-1.00, +1.00]`; model output cannot persist directly;
 failed batches leave the profile unchanged; explicit preferences cannot be
-silently weakened or generalized; callbacks and completed questionnaires are
+silently weakened or generalized; questionnaire batches may mutate only
+questionnaire-origin parameters; callbacks and completed questionnaires are
 idempotent; no live Telegram or model service in business-logic tests; no secrets
-or unnecessary answer text in logs
+or unnecessary answer text in logs; retention cleanup is bounded, excludes active
+questionnaires and current parameters, and never removes compact per-change audit
+records
 **Scale/Scope**: Initial single-instance deployment, up to roughly 10,000 users,
 one active questionnaire per user, 10 questions per session, and normally fewer
 than 100 preference parameters per user; direct editing, inference from behavior,
@@ -45,8 +49,9 @@ ranking, and digest delivery remain out of scope
 *GATE: Passed before Phase 0 research and re-checked after Phase 1 design.*
 
 - **Personalization — PASS**: Every profile and questionnaire is user-scoped.
-  Origin remains explicit, and deterministic application rejects
-  questionnaire-derived attempts to weaken or generalize explicit intent.
+  Origin remains immutable. Deterministic application permits questionnaire
+  batches to mutate only questionnaire-origin parameters and rejects duplicate
+  creation or any mutation targeting explicit, inference, or system parameters.
 - **Boundaries — PASS**: `preferences` owns domain and application behavior.
   Telegram only maps commands/callbacks to application services; aggregation,
   ranking, and digest modules are not dependencies.
@@ -55,11 +60,13 @@ ranking, and digest delivery remain out of scope
   schemas and semantic validators run before any atomic repository operation.
 - **Determinism and explainability — PASS**: Exact decimals, profile revisions,
   absolute target weights, versioned schemas, semantic keys, update batches, and
-  before/after history make accepted state transitions reproducible and auditable.
-  This feature does not calculate final ranking.
+  full before/after history plus indefinite compact per-change audit records make
+  accepted state transitions reproducible and auditable. This feature does not
+  calculate final ranking.
 - **Data and configuration — PASS**: PostgreSQL is authoritative and all new
   structures use Alembic. Model endpoint/name, timeouts, retry limits, context
-  bounds, question limits, and duplicate thresholds are settings.
+  bounds, question limits, duplicate thresholds, questionnaire/history retention,
+  cleanup cadence, and cleanup batch size are settings.
 - **Reliability and tests — PASS**: Ports allow model, clock, token, and persistence
   test doubles. Tests cover strict contracts, questionnaire quality, decimals,
   duplicate parameters, explicit-authority rules, concurrent updates, callback
@@ -102,11 +109,13 @@ src/anxious_news_bot/
 │   ├── services/
 │   │   ├── apply_changes.py
 │   │   ├── duplicates.py
+│   │   ├── retention.py
 │   │   └── tune.py
 │   └── infrastructure/
 │       ├── llm.py
 │       ├── models.py
-│       └── persistence.py
+│       ├── persistence.py
+│       └── retention.py
 └── telegram/
     └── tune.py
 
@@ -139,6 +148,9 @@ Research decisions and rejected alternatives are recorded in
   and [contracts/preference-changes.schema.json](contracts/preference-changes.schema.json).
 - Telegram command and callback behavior is defined in
   [contracts/telegram-tune.md](contracts/telegram-tune.md).
+- Bounded retention cleanup and immutable per-change audit evidence are defined in
+  [data-model.md](data-model.md) and
+  [contracts/preference-interfaces.md](contracts/preference-interfaces.md).
 - Setup and acceptance workflow is defined in [quickstart.md](quickstart.md).
 - The post-design Constitution Check remains fully passed.
 

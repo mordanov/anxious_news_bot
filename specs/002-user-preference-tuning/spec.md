@@ -118,6 +118,13 @@ that questionnaire updates do not silently relabel explicit preferences.
 2. **Given** a specific explicit preference and broader questionnaire evidence,
    **When** the profile is updated, **Then** the specific explicit preference is
    not silently replaced, weakened, or generalized.
+3. **Given** a questionnaire proposal targets an explicit, inferred, or system
+   parameter, **When** the batch is validated, **Then** the target remains
+   unchanged and the entire batch is rejected with a controlled outcome.
+4. **Given** questionnaire evidence is semantically equivalent to a protected
+   parameter, **When** creation is proposed, **Then** no duplicate is created;
+   genuinely distinct, narrower evidence may create a separate
+   questionnaire-origin parameter.
 
 ### Edge Cases
 
@@ -208,6 +215,34 @@ that questionnaire updates do not silently relabel explicit preferences.
   preference.
 - **FR-025**: This feature MUST NOT fetch or aggregate news, calculate article
   relevance, rank articles, select digest contents, or schedule digest delivery.
+- **FR-026**: Terminal questionnaire details and full preference-change history
+  MUST have independently configurable retention periods. Retention cleanup MUST
+  process bounded batches, MUST NOT remove active questionnaires or current
+  preference parameters, and MUST preserve one immutable compact audit record for
+  every applied parameter change after detailed retained data expires. Each compact
+  record MUST identify the parameter, action, source, questionnaire and update
+  batch, timestamp, and hashes of the previous state, new state, and reason.
+- **FR-027**: Questionnaire-derived batches MUST create parameters with
+  questionnaire origin and MAY adjust, refine, deactivate, or reactivate only
+  questionnaire-origin parameters. Explicit, inference, and system parameters
+  MUST be read-only to questionnaire batches. Equivalent protected parameters
+  MUST block duplicate creation; only a genuinely distinct semantic dimension may
+  create a separate questionnaire-origin parameter.
+
+### Questionnaire Action-by-Origin Policy
+
+| Target origin | Create equivalent | Adjust | Refine | Deactivate | Reactivate |
+|---|---|---|---|---|---|
+| questionnaire | Reuse existing parameter | Allowed | Allowed | Allowed | Allowed |
+| explicit | Reject duplicate | Prohibited | Prohibited | Prohibited | Prohibited |
+| inference | Reject duplicate | Prohibited | Prohibited | Prohibited | Prohibited |
+| system | Reject duplicate | Prohibited | Prohibited | Prohibited | Prohibited |
+
+All create actions set origin to `questionnaire` in deterministic application code.
+A create action is allowed beside a protected parameter only when validation finds
+a genuinely distinct, usually narrower, semantic dimension with a distinct
+semantic key. Answers remain durable questionnaire evidence even when a protected
+target causes the proposed batch to be rejected.
 
 ### Constitution Alignment *(mandatory)*
 
@@ -227,8 +262,9 @@ that questionnaire updates do not silently relabel explicit preferences.
 - **Persistence and Configuration**: User parameters, origins, questionnaire
   content and answers, application status, and full change history are durable.
   Stored-structure changes require controlled migration. Generation limits,
-  relevance of retained history, repetition thresholds, and validation constraints
-  are configurable where operational tuning is needed.
+  relevance of retained history, repetition thresholds, validation constraints,
+  terminal-questionnaire retention, full change-history retention, cleanup cadence,
+  and cleanup batch size are configurable.
 - **Failure Isolation and Testability**: A failure affects only the relevant user's
   tuning attempt and leaves the prior profile intact. Question generation,
   questionnaire validation, interpretation validation, duplicate detection,
@@ -253,6 +289,8 @@ that questionnaire updates do not silently relabel explicit preferences.
   persist itself.
 - **Preference Change History**: The audit record for one applied change, linking
   previous and new state to its source and questionnaire where applicable.
+- **Compact Preference Change Audit**: The immutable, indefinitely retained
+  per-change identity and hash evidence that remains after full history expires.
 
 ## Success Criteria *(mandatory)*
 
@@ -278,15 +316,21 @@ that questionnaire updates do not silently relabel explicit preferences.
 - **SC-008**: Across all failed or concurrently repeated update test cases, the
   previous profile remains complete and no completed questionnaire changes the
   profile more than once.
-- **SC-009**: 100% of applied parameter changes can be reconstructed from retained
-  previous state, new state, source, reason, questionnaire reference when
-  applicable, and timestamp.
+- **SC-009**: During the configured full-history retention period, 100% of applied
+  parameter changes can be reconstructed from retained previous state, new state,
+  source, reason, questionnaire reference when applicable, and timestamp. After
+  expiry, 100% of applied changes remain individually auditable through the compact
+  record required by FR-026.
 - **SC-010**: In a reviewed semantic-equivalence test set, at least 95% of obvious
   duplicate parameter proposals are rejected or redirected to reuse/refinement,
   with zero duplicate creations for exact semantic matches.
 - **SC-011**: Review of questionnaire-derived updates finds zero silent
   replacement, weakening, generalization, or relabeling of specific explicit
-  preferences.
+  preferences, and zero mutations of explicit, inference, or system parameters.
+- **SC-012**: In all retention tests, 100% of active questionnaires and current
+  preference parameters remain unchanged; expired detailed records are removed in
+  batches no larger than the configured limit, and every applied parameter change
+  retains its immutable compact audit record.
 
 ## Assumptions
 
@@ -300,6 +344,10 @@ that questionnaire updates do not silently relabel explicit preferences.
 - Question and option wording may use the user's interaction language when known.
 - Relevance windows for prior questionnaire context and substantial-repetition
   comparison are configurable and calibrated using representative reviewed data.
+- Terminal questionnaire details are retained for 365 days by default. Full
+  preference-change history is retained indefinitely by default; operators may set
+  a positive retention period when policy permits older details to be removed
+  while preserving immutable compact evidence for every individual change.
 - Direct preference editing, inferred preference collection from behavior,
   article ranking, digest creation, and preference-history user interfaces are
   outside this feature's initial scope.

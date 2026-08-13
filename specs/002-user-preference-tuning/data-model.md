@@ -47,9 +47,11 @@ One durable semantic dimension used by future personal ranking.
 **Constraints**: `(user_id, semantic_key)` is unique across active and inactive
 parameters so equivalent concepts are refined or reactivated rather than
 recreated. Weight has a database range check; application validation rejects
-non-canonical precision before persistence. Questionnaire application cannot
-change an explicit parameter in a way that weakens, generalizes, or relabels its
-specific intent.
+non-canonical precision before persistence. Origin is immutable. Questionnaire
+application may mutate only questionnaire-origin parameters; explicit, inference,
+and system parameters are read-only. An equivalent protected parameter blocks
+creation, while a genuinely distinct narrower dimension receives its own semantic
+key and questionnaire-origin parameter.
 
 ## Questionnaire
 
@@ -147,7 +149,10 @@ One validated interpretation and its idempotent application record.
 | user_id | UUID | Required reference to PreferenceProfile |
 | schema_version | text | Required change-contract version |
 | base_profile_revision | integer | Required non-negative revision |
+| resulting_profile_revision | integer | Required when applied; exactly base + 1 |
 | proposal_hash | text | Required deterministic hash of normalized changes |
+| change_count | integer | Required non-negative applied action count |
+| history_digest | text | Required when applied; deterministic digest of ordered history |
 | status | enum | `validated`, `applied`, `stale`, `rejected` |
 | error_code | text | Optional sanitized classification |
 | created_at / applied_at | timestamp | UTC |
@@ -155,11 +160,13 @@ One validated interpretation and its idempotent application record.
 **Constraints**: Only a fully validated normalized proposal can create a batch.
 The batch, profile revision increment, parameter mutations, history, and applied
 questionnaire state commit in one transaction. A unique questionnaire reference
-prevents replay.
+prevents replay. Applied summary fields are immutable and preserve minimal audit
+evidence at batch level; they supplement, but never replace, compact per-change
+audit rows after detailed history expires.
 
 ## PreferenceChangeHistory
 
-Immutable audit record for one parameter action in an applied batch.
+Immutable full-detail record for one parameter action in an applied batch.
 
 | Field | Type | Rules |
 |---|---|---|
@@ -178,6 +185,31 @@ Immutable audit record for one parameter action in an applied batch.
 semantic key, descriptive fields, exact weight string, origin, and active state.
 Rows are append-only.
 
+## PreferenceChangeAudit
+
+Compact immutable evidence for one applied parameter action. It is created in the
+same transaction as PreferenceChangeHistory and is never removed by retention
+cleanup.
+
+| Field | Type | Rules |
+|---|---|---|
+| id | UUID | Primary key; stable change identity shared with full history |
+| batch_id | UUID | Required reference to PreferenceUpdateBatch |
+| parameter_id | UUID | Required stable parameter identity |
+| action | enum | `create`, `adjust`, `refine`, `deactivate`, `reactivate` |
+| source | enum | `questionnaire`, `explicit`, `inference`, `system` |
+| questionnaire_id | UUID | Optional; required for questionnaire source |
+| previous_state_hash | text | Null only for create; deterministic canonical-state hash |
+| new_state_hash | text | Required deterministic canonical-state hash |
+| reason_hash | text | Required deterministic canonical-text hash |
+| changed_at | timestamp | UTC |
+
+**Constraints**: `(batch_id, parameter_id, action)` is unique. Rows are append-only
+and retained for the lifetime of the user's audit record. Hashes use a versioned
+canonicalization policy recorded with the batch schema version. The audit row
+identifies every applied change after verbose snapshots and reasons expire without
+retaining their sensitive content.
+
 ## Relationships
 
 ```text
@@ -189,6 +221,8 @@ QuestionnaireQuestion 1 ── 0..1 QuestionnaireAnswer
 Questionnaire 1 ── 0..1 PreferenceUpdateBatch
 PreferenceUpdateBatch 1 ── * PreferenceChangeHistory
 PreferenceParameter 1 ── * PreferenceChangeHistory
+PreferenceUpdateBatch 1 ── * PreferenceChangeAudit
+PreferenceParameter 1 ── * PreferenceChangeAudit
 ```
 
 ## Transaction and idempotency rules
@@ -203,19 +237,32 @@ PreferenceParameter 1 ── * PreferenceChangeHistory
 5. Interpretation runs outside a database transaction against a captured profile
    revision.
 6. Application claims the questionnaire, compares and increments the expected
-   profile revision, applies all changes, writes history, and marks the batch and
-   questionnaire applied in one transaction.
+   profile revision, applies all changes, writes full history and matching compact
+   per-change audit rows, and marks the batch and questionnaire applied in one
+   transaction.
 7. A stale revision applies nothing and returns the questionnaire to
    `answers_complete` for fresh interpretation.
 
 ## Retention and privacy
 
 - Preference parameters and applied history remain durable while the user profile
-  exists.
-- Questionnaire content, selected answers, context hashes, and applied batch
-  references remain long enough to support adaptation and audit; retention is
-  configurable and deletion must preserve any legally required minimal audit
-  linkage.
+  exists unless an operator configures a positive full-history retention period.
+- `questionnaire_retention_days` defaults to 365 and controls detailed content for
+  terminal questionnaires. Active states are never eligible. For applied sessions,
+  cleanup removes questions, options, and answers but retains the Questionnaire
+  shell and PreferenceUpdateBatch. Failed sessions may be deleted as a unit after
+  the cutoff because they never changed the profile.
+- `preference_history_retention_days` defaults to 0, meaning indefinite. When set
+  to a positive value, expired PreferenceChangeHistory rows may be removed.
+  PreferenceChangeAudit rows are never eligible for retention cleanup. The
+  associated PreferenceUpdateBatch also retains questionnaire and batch identities,
+  outcome, proposal hash, base and resulting profile revisions, applied timestamp,
+  change count, and a deterministic history digest.
+- Cleanup cadence and batch size are positive configuration values. Each tick
+  claims at most the configured number of eligible terminal questionnaires or
+  history batches, commits one bounded transaction, and records counts by data
+  class. Repeated or overlapping ticks are idempotent and never select active
+  questionnaires or current PreferenceParameter rows.
 - Raw model requests/responses are not stored by default. Invalid outcomes retain
   schema version, stage, sanitized error code, and correlation identifiers.
 - Structured logs exclude question/answer text, model credentials, callback

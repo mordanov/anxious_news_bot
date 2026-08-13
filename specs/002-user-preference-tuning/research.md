@@ -142,3 +142,44 @@ transaction rollback, and replay.
 **Alternatives considered**: Broad exception swallowing produces success-shaped
 failures. Live integration tests are nondeterministic and risk exposing user data
 or credentials.
+
+## Retention and audit linkage
+
+**Decision**: Configure terminal questionnaire-detail retention separately from
+full preference-change-history retention. Default questionnaire retention to 365
+days and full history to indefinite (`0`). Run bounded recurring cleanup outside
+Telegram handlers. Applied questionnaire and batch shells retain identities,
+outcome, proposal hash, profile revisions, timestamps, change count, and a
+deterministic history digest after detailed data expires. In addition, application
+creates one immutable compact audit row per change containing parameter/action
+identity, provenance, timestamp, and hashes of previous state, new state, and
+reason; these rows never expire.
+
+**Rationale**: Independent periods support privacy and storage policy without
+making active tuning unreliable or erasing evidence that an update occurred.
+Bounded batches prevent cleanup from monopolizing PostgreSQL, and retained hashes
+and identifiers preserve auditability for every individual change.
+
+**Alternatives considered**: Unbounded deletion creates long transactions.
+Deleting applied questionnaires, batches, or compact per-change audit rows destroys
+traceability. Retaining every answer and full before/after snapshot forever
+prevents operators from enforcing a data-minimization policy.
+
+## Origin authority policy
+
+**Decision**: Treat parameter origin as immutable. A questionnaire batch may create
+questionnaire-origin parameters and mutate only existing questionnaire-origin
+parameters. Explicit, inference, and system parameters are read-only. An equivalent
+protected parameter blocks duplicate creation; distinct narrower evidence may
+create a separate questionnaire-origin parameter with its own semantic key.
+
+**Rationale**: This gives explicit intent unambiguous authority, prevents generated
+output from relabeling provenance, and keeps questionnaire evidence independently
+auditable. The policy is deterministic and does not require judging whether a
+generated adjustment is a “safe” strengthening.
+
+**Alternatives considered**: Allowing questionnaire evidence to strengthen an
+explicit weight still mutates a user-authoritative statement without direct
+consent. Allowing refine/deactivate based on direction or confidence creates an
+ambiguous policy and non-repeatable edge cases. Creating an equivalent parameter
+would violate semantic deduplication.

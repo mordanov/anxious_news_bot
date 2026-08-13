@@ -132,6 +132,19 @@
       "credential_ref": null
     },
     {
+      "id": "d842925f-9fc0-464d-a7fc-4e8c53a4267f",
+      "name": "RIA Novosti",
+      "source_type": "rss",
+      "endpoint_url": "https://ria.ru/export/rss2/archive/index.xml",
+      "region": "Russia",
+      "country_code": "RU",
+      "language_code": "ru",
+      "enabled": true,
+      "quality_score": 0.50,
+      "polling_interval_seconds": 900,
+      "credential_ref": null
+    },
+    {
       "id": "2f508c2e-f0f5-4d7c-94f0-8cff18cd9937",
       "name": "El Mundo - España",
       "source_type": "rss",

@@ -1,118 +1,147 @@
-# Implementation Plan: [FEATURE]
+# Implementation Plan: User Preference Tuning
 
-**Branch**: `[###-feature-name]` | **Date**: [DATE] | **Spec**: [link]
-**Input**: Feature specification from `/specs/[###-feature-name]/spec.md`
-
-**Note**: This template is filled in by the `/speckit.plan` command. See `.specify/templates/plan-template.md` for the execution workflow.
+**Branch**: `002-user-preference-tuning` | **Date**: 2026-08-13 | **Spec**: [spec.md](spec.md)
+**Input**: Feature specification from `specs/002-user-preference-tuning/spec.md`
 
 ## Summary
 
-[Extract from feature spec: primary requirement + technical approach from research]
+Add a User Preferences module and thin Telegram `/tune` adapter to the existing
+Python modular monolith. Each durable session presents exactly 10 four-option
+questions, resumes after restart, and uses prior profile and questionnaire context
+for later sessions. Provider-neutral model adapters return strict versioned
+questionnaire and change-proposal documents; application services validate them,
+prevent semantic duplicates, and atomically apply deterministic incremental
+changes against a profile revision. Exact decimal weights, idempotent callbacks,
+and before/after history preserve profile integrity and auditability.
 
 ## Technical Context
 
-<!--
-  ACTION REQUIRED: Replace the content in this section with the technical details
-  for the project. The structure here is presented in advisory capacity to guide
-  the iteration process.
--->
-
-**Language/Version**: [e.g., Python 3.11, Swift 5.9, Rust 1.75 or NEEDS CLARIFICATION]  
-**Primary Dependencies**: [e.g., FastAPI, UIKit, LLVM or NEEDS CLARIFICATION]  
-**Storage**: [if applicable, e.g., PostgreSQL, CoreData, files or N/A]  
-**Testing**: [e.g., pytest, XCTest, cargo test or NEEDS CLARIFICATION]  
-**Target Platform**: [e.g., Linux server, iOS 15+, WASM or NEEDS CLARIFICATION]
-**Project Type**: [e.g., library/cli/web-service/mobile-app/compiler/desktop-app or NEEDS CLARIFICATION]  
-**Performance Goals**: [domain-specific, e.g., 1000 req/s, 10k lines/sec, 60 fps or NEEDS CLARIFICATION]  
-**Constraints**: [domain-specific, e.g., <200ms p95, <100MB memory, offline-capable or NEEDS CLARIFICATION]  
-**Scale/Scope**: [domain-specific, e.g., 10k users, 1M LOC, 50 screens or NEEDS CLARIFICATION]
+**Language/Version**: Python 3.11
+**Primary Dependencies**: python-telegram-bot 21.6+, SQLAlchemy 2.x, Alembic 1.x,
+Psycopg 3, HTTPX 0.27+, Pydantic 2.x, Tenacity 8+
+**Storage**: PostgreSQL 16+ with existing `pg_trgm`; Alembic-managed schema
+**Testing**: pytest, pytest-asyncio, fake questionnaire/interpreter ports, HTTPX
+MockTransport, and integration tests against ephemeral PostgreSQL
+**Target Platform**: Linux server, single application process initially
+**Project Type**: Python modular-monolith Telegram application with internal
+application services
+**Performance Goals**: 95% of locally accepted answers display the next state
+within 2 seconds; 95% of completed sessions display an outcome within 10 seconds
+after external interpretation returns; indexed resume and profile lookups remain
+bounded by one user
+**Constraints**: Exactly 10 questions and four options; weights use exact
+two-decimal values in `[-1.00, +1.00]`; model output cannot persist directly;
+failed batches leave the profile unchanged; explicit preferences cannot be
+silently weakened or generalized; callbacks and completed questionnaires are
+idempotent; no live Telegram or model service in business-logic tests; no secrets
+or unnecessary answer text in logs
+**Scale/Scope**: Initial single-instance deployment, up to roughly 10,000 users,
+one active questionnaire per user, 10 questions per session, and normally fewer
+than 100 preference parameters per user; direct editing, inference from behavior,
+ranking, and digest delivery remain out of scope
 
 ## Constitution Check
 
-*GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
+*GATE: Passed before Phase 0 research and re-checked after Phase 1 design.*
 
-- **Personalization**: The design optimizes per-user relevance and preserves the
-  authority of explicit user preferences.
-- **Boundaries**: The design preserves the modular monolith, keeps Telegram as a
-  thin adapter, and separates general aggregation from personal ranking.
-- **LLM trust boundary**: LLM outputs are structured, validated, normalized, and
-  applied by deterministic code; no LLM output directly mutates persistent state.
-- **Determinism and explainability**: State transitions and final ranking are
-  deterministic and auditable, with sufficient evidence retained to explain scores.
-- **Data and configuration**: PostgreSQL changes use migrations, and adjustable
-  behavior is configuration rather than magic numbers.
-- **Reliability and tests**: Business logic is testable without external services;
-  affected rules, failure isolation, scheduler idempotency, and ranking determinism
-  have planned coverage.
-- **Simplicity**: Added infrastructure has a concrete requirement; any exception is
-  documented in Complexity Tracking with the simpler alternative considered.
+- **Personalization — PASS**: Every profile and questionnaire is user-scoped.
+  Origin remains explicit, and deterministic application rejects
+  questionnaire-derived attempts to weaken or generalize explicit intent.
+- **Boundaries — PASS**: `preferences` owns domain and application behavior.
+  Telegram only maps commands/callbacks to application services; aggregation,
+  ranking, and digest modules are not dependencies.
+- **LLM trust boundary — PASS**: Generator, interpreter, and optional equivalence
+  classifier return untrusted mappings through provider-neutral ports. Strict
+  schemas and semantic validators run before any atomic repository operation.
+- **Determinism and explainability — PASS**: Exact decimals, profile revisions,
+  absolute target weights, versioned schemas, semantic keys, update batches, and
+  before/after history make accepted state transitions reproducible and auditable.
+  This feature does not calculate final ranking.
+- **Data and configuration — PASS**: PostgreSQL is authoritative and all new
+  structures use Alembic. Model endpoint/name, timeouts, retry limits, context
+  bounds, question limits, and duplicate thresholds are settings.
+- **Reliability and tests — PASS**: Ports allow model, clock, token, and persistence
+  test doubles. Tests cover strict contracts, questionnaire quality, decimals,
+  duplicate parameters, explicit-authority rules, concurrent updates, callback
+  replay, restart/resume, atomic rollback, and user isolation.
+- **Simplicity — PASS**: The existing process, HTTP client, PostgreSQL, and
+  `pg_trgm` are sufficient. No worker, broker, cache, vector database, or provider
+  SDK is added.
 
 ## Project Structure
 
 ### Documentation (this feature)
 
 ```text
-specs/[###-feature]/
-├── plan.md              # This file (/speckit.plan command output)
-├── research.md          # Phase 0 output (/speckit.plan command)
-├── data-model.md        # Phase 1 output (/speckit.plan command)
-├── quickstart.md        # Phase 1 output (/speckit.plan command)
-├── contracts/           # Phase 1 output (/speckit.plan command)
-└── tasks.md             # Phase 2 output (/speckit.tasks command - NOT created by /speckit.plan)
+specs/002-user-preference-tuning/
+├── plan.md
+├── research.md
+├── data-model.md
+├── quickstart.md
+├── contracts/
+│   ├── preference-interfaces.md
+│   ├── questionnaire-generation.schema.json
+│   ├── preference-changes.schema.json
+│   └── telegram-tune.md
+└── tasks.md
 ```
 
 ### Source Code (repository root)
-<!--
-  ACTION REQUIRED: Replace the placeholder tree below with the concrete layout
-  for this feature. Delete unused options and expand the chosen structure with
-  real paths (e.g., apps/admin, packages/something). The delivered plan must
-  not include Option labels.
--->
 
 ```text
-# [REMOVE IF UNUSED] Option 1: Single project (DEFAULT)
-src/
-├── models/
-├── services/
-├── cli/
-└── lib/
+migrations/
+└── versions/
+
+src/anxious_news_bot/
+├── app.py
+├── config.py
+├── preferences/
+│   ├── domain.py
+│   ├── ports.py
+│   ├── schemas.py
+│   ├── services/
+│   │   ├── apply_changes.py
+│   │   ├── duplicates.py
+│   │   └── tune.py
+│   └── infrastructure/
+│       ├── llm.py
+│       ├── models.py
+│       └── persistence.py
+└── telegram/
+    └── tune.py
 
 tests/
-├── contract/
-├── integration/
-└── unit/
-
-# [REMOVE IF UNUSED] Option 2: Web application (when "frontend" + "backend" detected)
-backend/
-├── src/
-│   ├── models/
-│   ├── services/
-│   └── api/
-└── tests/
-
-frontend/
-├── src/
-│   ├── components/
-│   ├── pages/
-│   └── services/
-└── tests/
-
-# [REMOVE IF UNUSED] Option 3: Mobile + API (when "iOS/Android" detected)
-api/
-└── [same as backend above]
-
-ios/ or android/
-└── [platform-specific structure: feature modules, UI flows, platform tests]
+├── unit/preferences/
+├── integration/preferences/
+└── unit/telegram/
 ```
 
-**Structure Decision**: [Document the selected structure and reference the real
-directories captured above]
+**Structure Decision**: Extend the existing single package with one
+`preferences` domain/application module and one thin Telegram adapter. Domain
+values and ports do not import Telegram, HTTP, ORM, or provider-specific types.
+Application services coordinate validation and state transitions; infrastructure
+contains HTTP and PostgreSQL mapping. This preserves the modular monolith without
+introducing infrastructure beyond the existing application and database.
+
+## Phase 0: Research Outcome
+
+Research decisions and rejected alternatives are recorded in
+[research.md](research.md). All Technical Context questions are resolved.
+
+## Phase 1: Design Outcome
+
+- Relational entities, constraints, relationships, concurrency rules, and state
+  transitions are defined in [data-model.md](data-model.md).
+- Application and persistence boundaries are defined in
+  [contracts/preference-interfaces.md](contracts/preference-interfaces.md).
+- Strict model documents are defined in
+  [contracts/questionnaire-generation.schema.json](contracts/questionnaire-generation.schema.json)
+  and [contracts/preference-changes.schema.json](contracts/preference-changes.schema.json).
+- Telegram command and callback behavior is defined in
+  [contracts/telegram-tune.md](contracts/telegram-tune.md).
+- Setup and acceptance workflow is defined in [quickstart.md](quickstart.md).
+- The post-design Constitution Check remains fully passed.
 
 ## Complexity Tracking
 
-> **Fill ONLY if Constitution Check has violations that must be justified**
-
-| Violation | Why Needed | Simpler Alternative Rejected Because |
-|-----------|------------|-------------------------------------|
-| [e.g., 4th project] | [current need] | [why 3 projects insufficient] |
-| [e.g., Repository pattern] | [specific problem] | [why direct DB access insufficient] |
+No constitution violations require justification.

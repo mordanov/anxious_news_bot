@@ -10,11 +10,12 @@ COPY pyproject.toml README.md alembic.ini ./
 COPY src/ src/
 COPY migrations/ migrations/
 COPY docker/ docker/
+COPY sources.json sources.json
 
 RUN pip install --no-cache-dir .
+RUN anxious-news-sources validate /app/sources.json
 
 RUN useradd --create-home --uid 10001 bot
 USER bot
 
 CMD ["anxious-news-bot"]
-

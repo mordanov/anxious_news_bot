@@ -37,7 +37,9 @@ docker compose up --build
 ```
 
 Compose starts PostgreSQL, waits for it to become healthy, creates the application
-database when it is missing, runs `alembic upgrade head`, and then starts the bot.
+database when it is missing, runs `alembic upgrade head`, transactionally applies
+the bundled `sources.json`, and then starts the bot. The image build validates the
+catalog before any container starts; invalid source configuration fails the build.
 Database data persists in the `postgres-data` volume.
 PostgreSQL is intentionally available only inside the Compose network to avoid
 conflicting with a local server; use the `docker compose exec postgres psql ...`
@@ -55,11 +57,12 @@ docker compose exec bot anxious-news-sources validate /app/sources.json
 docker compose exec postgres psql -U anxious_news -d anxious_news
 ```
 
-To make a source catalog available to the CLI, copy it into the bot container:
+`sources.json` is copied into the image at `/app/sources.json` and applied on every
+startup. Applying it repeatedly is safe: listed sources are added or updated and
+omitted database sources remain unchanged. After changing the file, rebuild:
 
 ```bash
-docker compose cp sources.json bot:/app/sources.json
-docker compose exec bot anxious-news-sources apply /app/sources.json
+docker compose up --build
 ```
 
 Stop containers while preserving the database with `docker compose down`. Remove

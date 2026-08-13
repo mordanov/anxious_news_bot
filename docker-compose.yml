@@ -55,6 +55,17 @@ services:
         condition: service_completed_successfully
     restart: "no"
 
+  sources-init:
+    build:
+      context: .
+    command: ["anxious-news-sources", "apply", "/app/sources.json"]
+    environment:
+      <<: *application-environment
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: "no"
+
   bot:
     build:
       context: .
@@ -62,7 +73,7 @@ services:
       <<: *application-environment
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:?Set TELEGRAM_BOT_TOKEN in .env}
     depends_on:
-      migrate:
+      sources-init:
         condition: service_completed_successfully
     init: true
     stdin_open: true

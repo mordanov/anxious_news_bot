@@ -128,6 +128,20 @@ docker compose up --build
 Stop containers while preserving the database with `docker compose down`. Remove
 the test database volume as well with `docker compose down -v`.
 
+## Shared infrastructure deployment
+
+Production runs as the `anxious-news-bot` worker in the shared `web-folders`
+Compose stack. It uses the stack's `recipes-db` PostgreSQL service and has no
+HTTP endpoint, nginx route, DNS record, or TLS certificate. On every container
+start, the shared service runs `alembic upgrade head`, applies
+`/app/sources.json`, and then starts Telegram polling.
+
+`.github/workflows/build-deploy.yml` builds and deploys the Python 3.13 image
+only after the existing `CI` workflow succeeds on `main`. Configure
+`VPS_HOST`, `VPS_USER`, and `VPS_SSH_KEY` as GitHub Actions secrets. Configure
+the `ANXIOUS_NEWS_BOT_*` database, Telegram, and model-provider variables in the
+VPS `web-folders/.env`; never store their production values in this repository.
+
 Operational settings include:
 
 | Variable | Default | Purpose |

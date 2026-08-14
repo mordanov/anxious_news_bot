@@ -30,3 +30,10 @@ class DigestConfigurationService:
         return await self._repository.set_count(
             telegram_user_id, language_hint, count, now
         )
+
+    async def get_current(
+        self,
+        telegram_user_id: int,
+        language_hint: str | None,
+    ) -> DigestConfigurationSnapshot:
+        return await self._repository.get_current(telegram_user_id, language_hint)

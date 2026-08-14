@@ -6,6 +6,7 @@ from datetime import datetime
 from telegram import Update
 from telegram.ext import ContextTypes
 
+from anxious_news_bot.digest.services.configuration import DigestConfigurationService
 from anxious_news_bot.preferences.domain import SupportedLanguage
 from anxious_news_bot.preferences.services.language import UserLanguageService
 from anxious_news_bot.ranking.domain import RankedNewsItem
@@ -45,10 +46,12 @@ class NewsTelegramAdapter:
         service: PersonalNewsService,
         language_service: UserLanguageService,
         translator: NewsTitleTranslator,
+        configuration_service: DigestConfigurationService | None = None,
     ) -> None:
         self._service = service
         self._language_service = language_service
         self._translator = translator
+        self._configuration_service = configuration_service
 
     async def command(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         del context
@@ -60,11 +63,18 @@ class NewsTelegramAdapter:
         language = await self._language_service.get(user.id, user.language_code)
         text = MESSAGES[language]
         status_message = await message.reply_text(text["processing"])
+        count = 10
+        if self._configuration_service is not None:
+            config = await self._configuration_service.get_current(
+                user.id,
+                user.language_code,
+            )
+            count = config.digest_count
         try:
             items = await self._service.top(
                 user.id,
                 f"telegram-news:{update.update_id}",
-                count=10,
+                count=count,
             )
             translated_titles = await self._translator.translate(
                 tuple(item.article.title for item in items),

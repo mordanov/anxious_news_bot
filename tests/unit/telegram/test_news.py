@@ -29,6 +29,9 @@ async def test_news_command_renders_ranked_articles() -> None:
     translator = Mock(
         translate=AsyncMock(return_value=("Important translated update",))
     )
+    configuration_service = Mock(
+        get_current=AsyncMock(return_value=Mock(digest_count=7))
+    )
     status_message = Mock(edit_text=AsyncMock())
     reply = AsyncMock(return_value=status_message)
     update = Mock(
@@ -37,14 +40,17 @@ async def test_news_command_renders_ranked_articles() -> None:
         message=Mock(reply_text=reply),
     )
 
-    await NewsTelegramAdapter(service, language_service, translator).command(
-        update, Mock()
-    )
+    await NewsTelegramAdapter(
+        service,
+        language_service,
+        translator,
+        configuration_service,
+    ).command(update, Mock())
 
     service.top.assert_awaited_once_with(
         123,
         "telegram-news:99",
-        count=10,
+        count=7,
     )
     rendered = status_message.edit_text.await_args.args[0]
     translator.translate.assert_awaited_once_with(

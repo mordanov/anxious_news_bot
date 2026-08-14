@@ -43,6 +43,9 @@ class FixedClock:
 class FakeDigestConfigurationRepository:
     def __init__(self) -> None:
         self.configurations: dict[UUID, DigestConfigurationSnapshot] = {}
+        self.configurations_by_telegram_user: dict[
+            int, DigestConfigurationSnapshot
+        ] = {}
         self.due_queue: list[DueOccurrence] = []
         self.success_calls: list[tuple[UUID, datetime]] = []
         self.failure_calls: list[tuple[UUID, str, datetime]] = []
@@ -65,10 +68,27 @@ class FakeDigestConfigurationRepository:
             schedule_revision=0,
         )
         self.configurations[user_id] = snap
+        self.configurations_by_telegram_user[telegram_user_id] = snap
         return snap
 
     async def get(self, user_id: UUID) -> DigestConfigurationSnapshot | None:
         return self.configurations.get(user_id)
+
+    async def get_current(
+        self,
+        telegram_user_id: int,
+        language_hint: str | None,
+    ) -> DigestConfigurationSnapshot:
+        del language_hint
+        existing = self.configurations_by_telegram_user.get(telegram_user_id)
+        if existing is not None:
+            return existing
+        return await self.set_count(
+            telegram_user_id=telegram_user_id,
+            language_hint=None,
+            count=10,
+            changed_at=datetime(2026, 1, 15, 9, 0, tzinfo=UTC),
+        )
 
     async def claim_due(
         self, now: datetime, batch_size: int

@@ -73,7 +73,9 @@ class CountTelegramAdapter:
         if len(parts) != 2:
             # No argument provided, show current count
             try:
-                current_config = await self._service.get_current(user.id)
+                current_config = await self._service.get_current(
+                    user.id, user.language_code
+                )
                 current_count = current_config.digest_count if current_config else None
                 if current_count is None:
                     await message.reply_text(GUIDANCE_MESSAGES[language])

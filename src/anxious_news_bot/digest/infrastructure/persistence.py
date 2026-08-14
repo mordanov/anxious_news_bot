@@ -111,6 +111,19 @@ class SQLAlchemyDigestRepository:
                 return None
             return self._config_snapshot(config)
 
+    async def get_current(
+        self,
+        telegram_user_id: int,
+        language_hint: str | None,
+    ) -> DigestConfigurationSnapshot:
+        async with self._database.session() as session:
+            provisioned = await self._user_provisioner.ensure(
+                session,
+                telegram_user_id=telegram_user_id,
+                language_hint=language_hint,
+            )
+            return self._config_snapshot(provisioned.digest_configuration)
+
     async def claim_due(
         self, now: datetime, batch_size: int
     ) -> tuple[DueOccurrence, ...]:

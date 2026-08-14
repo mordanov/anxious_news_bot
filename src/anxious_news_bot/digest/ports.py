@@ -39,6 +39,12 @@ class DigestConfigurationRepository(Protocol):
 
     async def get(self, user_id: UUID) -> DigestConfigurationSnapshot | None: ...
 
+    async def get_current(
+        self,
+        telegram_user_id: int,
+        language_hint: str | None,
+    ) -> DigestConfigurationSnapshot: ...
+
     async def claim_due(
         self, now: datetime, batch_size: int
     ) -> tuple[DueOccurrence, ...]: ...

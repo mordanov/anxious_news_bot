@@ -336,11 +336,6 @@ def build_application(settings: Settings) -> Application:
         retry_attempts=settings.ranking_model_retry_attempts,
         max_response_bytes=settings.ranking_model_max_response_bytes,
     )
-    news_adapter = NewsTelegramAdapter(
-        personal_news_service,
-        language_service,
-        news_title_translator,
-    )
     ranking_retention_service = RankingRetentionService(
         ranking_repository,
         RankingClock(),
@@ -403,6 +398,12 @@ def build_application(settings: Settings) -> Application:
     count_adapter = CountTelegramAdapter(
         digest_config_service,
         language_service,
+    )
+    news_adapter = NewsTelegramAdapter(
+        personal_news_service,
+        language_service,
+        news_title_translator,
+        digest_config_service,
     )
     digest_retention_service = DigestRetentionService(
         digest_repository,

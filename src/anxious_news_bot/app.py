@@ -278,6 +278,7 @@ def build_application(settings: Settings) -> Application:
     help_adapter = HelpTelegramAdapter(language_service)
     specify_adapter = SpecifyTelegramAdapter(
         specify_service,
+        language_service,
         max_text_length=settings.preferences_explicit_request_max_length,
     )
     retention_service = PreferenceRetentionService(

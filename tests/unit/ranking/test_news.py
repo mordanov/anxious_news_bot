@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from decimal import Decimal
 from types import SimpleNamespace
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, Mock
 from uuid import UUID, uuid4
 
 import pytest
@@ -202,9 +202,13 @@ def _selected_records(article_ids):
 
 
 async def test_evaluates_candidates_ranks_and_returns_selected_articles(
-    caplog: pytest.LogCaptureFixture,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    caplog.set_level("INFO", logger="anxious_news_bot.ranking.services.news")
+    info_log = Mock()
+    monkeypatch.setattr(
+        "anxious_news_bot.ranking.services.news.LOGGER.info",
+        info_log,
+    )
     user_id = uuid4()
     article_ids = (uuid4(), uuid4())
     repository = _RecordingRepository(
@@ -229,15 +233,16 @@ async def test_evaluates_candidates_ranks_and_returns_selected_articles(
     assert all(isinstance(item.score, Decimal) for item in result)
     assert len(evaluator.evaluated_article_ids) == 2
     assert len(ranker.calls) == 1
-    selection_record = next(
-        record
-        for record in caplog.records
-        if record.message == "personal_news_selection_completed"
+    selection_call = next(
+        call
+        for call in info_log.call_args_list
+        if call.args == ("personal_news_selection_completed",)
     )
-    assert selection_record.ranking["requested_count"] == 10
-    assert selection_record.ranking["candidate_count"] == 2
-    assert selection_record.ranking["delivery_item_count"] == 2
-    assert selection_record.ranking["shortage_count"] == 8
+    selection_fields = selection_call.kwargs["extra"]["ranking"]
+    assert selection_fields["requested_count"] == 10
+    assert selection_fields["candidate_count"] == 2
+    assert selection_fields["delivery_item_count"] == 2
+    assert selection_fields["shortage_count"] == 8
 
 
 # ---------------------------------------------------------------------------

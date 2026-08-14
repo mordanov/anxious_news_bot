@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
+from unittest.mock import Mock
 from uuid import UUID, uuid4
 
 import pytest
@@ -382,11 +383,12 @@ def make_source(
 
 
 async def test_cycle_logs_source_and_cycle_counts(
-    caplog: pytest.LogCaptureFixture,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    caplog.set_level(
-        "INFO",
-        logger="anxious_news_bot.news.services.aggregate",
+    info_log = Mock()
+    monkeypatch.setattr(
+        "anxious_news_bot.news.services.aggregate.LOGGER.info",
+        info_log,
     )
     repository = FakeRepository([make_source("one")])
 
@@ -398,20 +400,26 @@ async def test_cycle_logs_source_and_cycle_counts(
     ).run_cycle()
 
     assert result.status is AggregationStatus.COMPLETED
-    source_record = next(
-        record for record in caplog.records if record.message == "news_source_completed"
+    source_call = next(
+        call
+        for call in info_log.call_args_list
+        if call.args == ("news_source_completed",)
     )
-    assert source_record.news["fetched_count"] == 2
-    assert source_record.news["accepted_count"] == 1
-    assert source_record.news["rejected_count"] == 1
-    assert source_record.news["rejection_code_counts"] == {"missing_title": 1}
-    assert source_record.news["new_article_count"] == 1
-    cycle_record = next(
-        record for record in caplog.records if record.message == "news_cycle_completed"
+    source_fields = source_call.kwargs["extra"]["news"]
+    assert source_fields["fetched_count"] == 2
+    assert source_fields["accepted_count"] == 1
+    assert source_fields["rejected_count"] == 1
+    assert source_fields["rejection_code_counts"] == {"missing_title": 1}
+    assert source_fields["new_article_count"] == 1
+    cycle_call = next(
+        call
+        for call in info_log.call_args_list
+        if call.args == ("news_cycle_completed",)
     )
-    assert cycle_record.news["due_source_count"] == 1
-    assert cycle_record.news["source_success_count"] == 1
-    assert cycle_record.news["new_article_count"] == 1
+    cycle_fields = cycle_call.kwargs["extra"]["news"]
+    assert cycle_fields["due_source_count"] == 1
+    assert cycle_fields["source_success_count"] == 1
+    assert cycle_fields["new_article_count"] == 1
 
 
 async def test_cycle_isolates_sources_records_rejections_and_returns_only_new() -> None:

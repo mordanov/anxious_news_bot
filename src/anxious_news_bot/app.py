@@ -4,6 +4,7 @@ from decimal import Decimal
 import httpx
 from apscheduler.jobstores.base import JobLookupError
 from telegram import BotCommand, Update
+from telegram.error import NetworkError, TelegramError
 from telegram.ext import (
     Application,
     CallbackQueryHandler,
@@ -409,8 +410,11 @@ def build_application(settings: Settings) -> Application:
     )
 
     async def post_init(application: Application) -> None:
-        await application.bot.set_my_commands(_BOT_COMMANDS)
-        LOGGER.info("Bot commands registered (%d)", len(_BOT_COMMANDS))
+        try:
+            await application.bot.set_my_commands(_BOT_COMMANDS)
+            LOGGER.info("Bot commands registered (%d)", len(_BOT_COMMANDS))
+        except (NetworkError, TelegramError) as e:
+            LOGGER.warning("Failed to register bot commands: %s", e)
         if application.job_queue is None:
             raise RuntimeError("Telegram JobQueue is required")
         scheduler = AggregationScheduler(

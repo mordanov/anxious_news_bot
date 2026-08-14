@@ -9,6 +9,7 @@ from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
+from anxious_news_bot.digest.infrastructure import models as digest_models  # noqa: F401
 from anxious_news_bot.infrastructure.database import Base
 from anxious_news_bot.news.infrastructure import models as news_models  # noqa: F401
 from anxious_news_bot.preferences.infrastructure import (

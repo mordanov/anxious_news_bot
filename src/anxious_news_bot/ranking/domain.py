@@ -21,6 +21,7 @@ PERSONAL_COEFFICIENT_FLOOR = Decimal("0.40000")
 MAXIMUM_CANDIDATE_COUNT = 500
 MAXIMUM_ACTIVE_PARAMETERS = 100
 MAXIMUM_EXPLANATION_CONTRIBUTIONS = 10
+GROUNDED_SUMMARY_MAX_CHARS = 4000
 _DIGEST = re.compile(r"^[a-f0-9]{64}$")
 _REASON_CODE = re.compile(r"^[a-z0-9]+(?:_[a-z0-9]+)*$")
 
@@ -59,6 +60,19 @@ class DeliveryArticle:
     canonical_url: str
     source_name: str
     published_at: datetime
+    article_analysis_id: UUID | None = None
+    event_group_id: UUID | None = None
+    normalized_text: str | None = None
+    grounded_summary: str = ""
+
+    def __post_init__(self) -> None:
+        if not self.grounded_summary:
+            fallback = (self.summary or self.normalized_text or "").strip()
+            object.__setattr__(
+                self,
+                "grounded_summary",
+                fallback[:GROUNDED_SUMMARY_MAX_CHARS],
+            )
 
 
 @dataclass(frozen=True, slots=True)
@@ -66,6 +80,18 @@ class RankedNewsItem:
     article: DeliveryArticle
     position: int
     score: Decimal
+
+
+@dataclass(frozen=True, slots=True)
+class PersonalNewsSelection:
+    ranking_run_id: UUID | None
+    profile_revision: int
+    ranking_at: datetime
+    items: tuple[RankedNewsItem, ...]
+
+    def __post_init__(self) -> None:
+        if self.profile_revision < 0:
+            raise ValueError("profile_revision must be non-negative")
 
 
 class PersonalState(StrEnum):

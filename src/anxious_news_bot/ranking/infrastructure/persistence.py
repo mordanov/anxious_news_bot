@@ -89,6 +89,16 @@ class SQLAlchemyRankingRepository:
                 )
             )
 
+    async def resolve_profile_revision(self, user_id: UUID) -> int:
+        async with self._database.session() as session:
+            profile = await session.get(PreferenceProfile, user_id)
+            if profile is None:
+                raise RankingRunError(
+                    "preference profile is missing",
+                    code="missing_profile",
+                )
+            return profile.revision
+
     async def has_active_nonzero_preferences(self, user_id: UUID) -> bool:
         async with self._database.session() as session:
             return bool(
@@ -177,6 +187,7 @@ class SQLAlchemyRankingRepository:
                     .where(NormalizedArticle.id.in_(ids))
                 )
             ).all()
+            analyses = await self._latest_analyses_by_article(session, ids)
         by_id = {
             article.id: DeliveryArticle(
                 article_id=article.id,
@@ -185,6 +196,11 @@ class SQLAlchemyRankingRepository:
                 canonical_url=article.canonical_url,
                 source_name=source_name,
                 published_at=article.published_at,
+                article_analysis_id=(
+                    analyses[article.id].id if article.id in analyses else None
+                ),
+                event_group_id=article.event_group_id,
+                normalized_text=article.normalized_text,
             )
             for article, source_name in rows
             if article.published_at is not None

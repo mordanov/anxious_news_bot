@@ -14,6 +14,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from anxious_news_bot.infrastructure.database import Database
+from anxious_news_bot.infrastructure.users import (
+    ApplicationUserProvisioner,
+)
 from anxious_news_bot.preferences.domain import (
     ExplicitRequestClaim,
     ExplicitRequestStatus,
@@ -101,6 +104,7 @@ class SQLAlchemyPreferenceRepository:
         history_context_limit: int = 20,
         duplicate_threshold: float = 0.72,
         explicit_history_limit: int | None = None,
+        user_provisioner: ApplicationUserProvisioner | None = None,
     ) -> None:
         self._database = database
         self._history_context_limit = history_context_limit
@@ -111,6 +115,7 @@ class SQLAlchemyPreferenceRepository:
             else explicit_history_limit
         )
         self._change_validator = DeterministicPreferenceChangeValidator()
+        self._user_provisioner = user_provisioner or ApplicationUserProvisioner()
 
     async def get_or_create_language(
         self,
@@ -1205,35 +1210,12 @@ class SQLAlchemyPreferenceRepository:
         telegram_user_id: int,
         language_code: str | None,
     ) -> tuple[ApplicationUser, PreferenceProfile]:
-        user_insert = insert(ApplicationUser).values(
+        provisioned = await self._user_provisioner.ensure(
+            session,
             telegram_user_id=telegram_user_id,
-            language_code=normalize_language_code(language_code).value,
+            language_hint=language_code,
         )
-        user = (
-            await session.execute(
-                user_insert.on_conflict_do_nothing(
-                    index_elements=[ApplicationUser.telegram_user_id],
-                ).returning(ApplicationUser)
-            )
-        ).scalar_one_or_none()
-        if user is None:
-            user = await session.scalar(
-                select(ApplicationUser).where(
-                    ApplicationUser.telegram_user_id == telegram_user_id
-                )
-            )
-        if user is None:
-            raise RuntimeError("application user claim failed")
-        await session.execute(
-            insert(PreferenceProfile)
-            .values(user_id=user.id, revision=0)
-            .on_conflict_do_nothing(index_elements=[PreferenceProfile.user_id])
-        )
-        await session.flush()
-        profile = await session.get(PreferenceProfile, user.id)
-        if profile is None:
-            raise RuntimeError("preference profile claim failed")
-        return user, profile
+        return provisioned.application_user, provisioned.preference_profile
 
     @staticmethod
     def _prevalidate(

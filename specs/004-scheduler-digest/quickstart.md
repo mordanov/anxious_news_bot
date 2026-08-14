@@ -191,8 +191,8 @@ Then run project checks:
 
 ```bash
 .venv/bin/python -m pytest
-.venv/bin/ruff check .
-.venv/bin/ruff format --check .
+.venv/bin/python -m ruff check .
+.venv/bin/python -m ruff format --check .
 ```
 
 Inspect migration state:
@@ -201,7 +201,7 @@ Inspect migration state:
 .venv/bin/alembic current
 ```
 
-Expected head: `005_create_scheduler_digest`.
+Expected head: `005_scheduler_digest`.
 
 ## Safe Observability
 

@@ -24,9 +24,9 @@ and demonstrated independently after the shared foundation.
 
 **Purpose**: Create the digest module and test layout without adding dependencies.
 
-- [ ] T001 Create digest package skeletons in `src/anxious_news_bot/digest/__init__.py`, `src/anxious_news_bot/digest/services/__init__.py`, and `src/anxious_news_bot/digest/infrastructure/__init__.py`
-- [ ] T002 [P] Create reusable fixed-clock, configuration, execution, article, composer, and delivery fakes in `tests/fixtures/digest.py`
-- [ ] T003 [P] Create PostgreSQL digest integration fixtures and schema lifecycle helpers in `tests/integration/digest/__init__.py` and `tests/integration/digest/conftest.py`
+- [X] T001 Create digest package skeletons in `src/anxious_news_bot/digest/__init__.py`, `src/anxious_news_bot/digest/services/__init__.py`, and `src/anxious_news_bot/digest/infrastructure/__init__.py`
+- [X] T002 [P] Create reusable fixed-clock, configuration, execution, article, composer, and delivery fakes in `tests/fixtures/digest.py`
+- [X] T003 [P] Create PostgreSQL digest integration fixtures and schema lifecycle helpers in `tests/integration/digest/__init__.py` and `tests/integration/digest/conftest.py`
 
 ---
 
@@ -39,19 +39,19 @@ repository state transitions required by every story.
 
 ### Tests for the Foundation
 
-- [ ] T004 [P] Add failing validation tests for all `DIGEST_*` settings, timezone/local-time parsing, count/candidate bounds, claim budgets, material-update policy/version/similarity/text bounds, retry ordering, and history-horizon compatibility in `tests/test_config.py`
-- [ ] T005 [P] Add failing domain and strict schema tests for count bounds, execution/item invariants, state transitions, material-update evidence bases/outcomes/hashes/thresholds, exact content indexes, URL/text limits, and typed failures in `tests/unit/digest/test_domain.py` and `tests/unit/digest/test_schemas.py`
-- [ ] T006 [P] Add failing integration tests for migration backfill defaults, material-update evidence constraints and pair/policy uniqueness, post-migration user provisioning, concurrent self-healing, enums, indexes, relationships, and terminal-state constraints in `tests/integration/digest/test_models.py` and `tests/integration/digest/test_user_provisioning.py`
-- [ ] T007 [P] Add failing repository contract tests for occurrence claims, attempt compare-and-set, atomic item insertion, monotonic success/failure fields, and terminal-state rejection in `tests/integration/digest/test_execution_repository.py`
+- [X] T004 [P] Add failing validation tests for all `DIGEST_*` settings, timezone/local-time parsing, count/candidate bounds, claim budgets, material-update policy/version/similarity/text bounds, retry ordering, and history-horizon compatibility in `tests/test_config.py`
+- [X] T005 [P] Add failing domain and strict schema tests for count bounds, execution/item invariants, state transitions, material-update evidence bases/outcomes/hashes/thresholds, exact content indexes, URL/text limits, and typed failures in `tests/unit/digest/test_domain.py` and `tests/unit/digest/test_schemas.py`
+- [X] T006 [P] Add failing integration tests for migration backfill defaults, material-update evidence constraints and pair/policy uniqueness, post-migration user provisioning, concurrent self-healing, enums, indexes, relationships, and terminal-state constraints in `tests/integration/digest/test_models.py` and `tests/integration/digest/test_user_provisioning.py`
+- [X] T007 [P] Add failing repository contract tests for occurrence claims, attempt compare-and-set, atomic item insertion, monotonic success/failure fields, and terminal-state rejection in `tests/integration/digest/test_execution_repository.py`
 
 ### Implementation for the Foundation
 
-- [ ] T008 Implement validated digest settings and environment parsing without new dependencies in `src/anxious_news_bot/config.py`
-- [ ] T009 [P] Implement immutable digest domain values, enums, material-update evidence snapshots, occurrence/item validation, and typed retry/delivery errors in `src/anxious_news_bot/digest/domain.py` and `src/anxious_news_bot/digest/errors.py`
-- [ ] T010 Implement application protocols for clock, identity claim, configuration, execution, candidate filtering, content composition, rendering, and delivery in `src/anxious_news_bot/digest/ports.py`, then implement strict indexed content models in `src/anxious_news_bot/digest/schemas.py`
-- [ ] T011 Implement digest ORM entities including immutable material-update evidence and migration `005_scheduler_digest` with disabled-safe user backfill and `004_question_dimension_context` down revision in `src/anxious_news_bot/digest/infrastructure/models.py` and `migrations/versions/005_create_scheduler_digest.py`
-- [ ] T012 Extract the sole transactional application-user/profile/digest-configuration provisioner, refactor preference persistence to use it, and implement digest configuration/execution repositories, due/retry claims, state compare-and-set, atomic item/part persistence, and monotonic terminal summaries in `src/anxious_news_bot/infrastructure/users.py`, `src/anxious_news_bot/preferences/infrastructure/persistence.py`, and `src/anxious_news_bot/digest/infrastructure/persistence.py`
-- [ ] T013 [P] Add redacted structured digest event builders and JSON formatter support for bounded `digest` context in `src/anxious_news_bot/digest/observability.py` and `src/anxious_news_bot/logging.py`
+- [X] T008 Implement validated digest settings and environment parsing without new dependencies in `src/anxious_news_bot/config.py`
+- [X] T009 [P] Implement immutable digest domain values, enums, material-update evidence snapshots, occurrence/item validation, and typed retry/delivery errors in `src/anxious_news_bot/digest/domain.py` and `src/anxious_news_bot/digest/errors.py`
+- [X] T010 Implement application protocols for clock, identity claim, configuration, execution, candidate filtering, content composition, rendering, and delivery in `src/anxious_news_bot/digest/ports.py`, then implement strict indexed content models in `src/anxious_news_bot/digest/schemas.py`
+- [X] T011 Implement digest ORM entities including immutable material-update evidence and migration `005_scheduler_digest` with disabled-safe user backfill and `004_question_dimension_context` down revision in `src/anxious_news_bot/digest/infrastructure/models.py` and `migrations/versions/005_create_scheduler_digest.py`
+- [X] T012 Extract the sole transactional application-user/profile/digest-configuration provisioner, refactor preference persistence to use it, and implement digest configuration/execution repositories, due/retry claims, state compare-and-set, atomic item/part persistence, and monotonic terminal summaries in `src/anxious_news_bot/infrastructure/users.py`, `src/anxious_news_bot/preferences/infrastructure/persistence.py`, and `src/anxious_news_bot/digest/infrastructure/persistence.py`
+- [X] T013 [P] Add redacted structured digest event builders and JSON formatter support for bounded `digest` context in `src/anxious_news_bot/digest/observability.py` and `src/anxious_news_bot/logging.py`
 
 **Checkpoint**: Settings, contracts, migration, and persistence foundation pass
 without Telegram, network access, or a live model.
@@ -72,23 +72,23 @@ exactly three.
 
 ### Tests for User Story 1
 
-- [ ] T014 [P] [US1] Add failing deterministic tests for next-occurrence calculation, IANA validation, DST earlier-fold choice, missing-time advancement, occurrence keys, and schedule revision snapshots in `tests/unit/digest/test_schedule.py`
-- [ ] T015 [P] [US1] Add failing ranking regression tests for internal user selection, bounded candidate overrides, pre-evaluation candidate filtering, grounded summary fallback, selection metadata, and unchanged `/news` behavior in `tests/unit/ranking/test_news.py`
-- [ ] T016 [P] [US1] Add failing composer tests for one 1..20 indexed request, Russian/English/Spanish output, exact coverage, grounding limits, metadata preservation, and no partial acceptance in `tests/unit/digest/test_content.py` and `tests/unit/digest/test_llm.py`
-- [ ] T017 [P] [US1] Add failing pure Telegram rendering/delivery tests for localized headers, title-summary-source-time-URL blocks, stable hashes/ranges, 3900-character parts, item order, and empty-digest suppression in `tests/unit/telegram/test_digest.py`
-- [ ] T018 [P] [US1] Add failing execution-service tests for captured count/profile/language, analysis enforcement, ranking delegation, no filler, zero-item completion, and per-user exception isolation in `tests/unit/digest/test_execute.py`
-- [ ] T019 [P] [US1] Add failing end-to-end tests for enabled/due versus disabled/not-due users, overlapping claims, count-10/three-item shortage, localized item snapshots, completion summaries, a sub-second 100-row claim query over 10,000 configurations, and at least 990 durable claims from a 1,000-user due burst within five simulated minutes in `tests/integration/digest/test_scheduled_delivery.py` and `tests/integration/digest/test_performance.py`
+- [X] T014 [P] [US1] Add failing deterministic tests for next-occurrence calculation, IANA validation, DST earlier-fold choice, missing-time advancement, occurrence keys, and schedule revision snapshots in `tests/unit/digest/test_schedule.py`
+- [X] T015 [P] [US1] Add failing ranking regression tests for internal user selection, bounded candidate overrides, pre-evaluation candidate filtering, grounded summary fallback, selection metadata, and unchanged `/news` behavior in `tests/unit/ranking/test_news.py`
+- [X] T016 [P] [US1] Add failing composer tests for one 1..20 indexed request, Russian/English/Spanish output, exact coverage, grounding limits, metadata preservation, and no partial acceptance in `tests/unit/digest/test_content.py` and `tests/unit/digest/test_llm.py`
+- [X] T017 [P] [US1] Add failing pure Telegram rendering/delivery tests for localized headers, title-summary-source-time-URL blocks, stable hashes/ranges, 3900-character parts, item order, and empty-digest suppression in `tests/unit/telegram/test_digest.py`
+- [X] T018 [P] [US1] Add failing execution-service tests for captured count/profile/language, analysis enforcement, ranking delegation, no filler, zero-item completion, and per-user exception isolation in `tests/unit/digest/test_execute.py`
+- [X] T019 [P] [US1] Add failing end-to-end tests for enabled/due versus disabled/not-due users, overlapping claims, count-10/three-item shortage, localized item snapshots, completion summaries, a sub-second 100-row claim query over 10,000 configurations, and at least 990 durable claims from a 1,000-user due burst within five simulated minutes in `tests/integration/digest/test_scheduled_delivery.py` and `tests/integration/digest/test_performance.py`
 
 ### Implementation for User Story 1
 
-- [ ] T020 [P] [US1] Implement daily timezone occurrence resolution, canonical occurrence keys, fold/gap policy, and multi-batch due draining until empty, per-tick claim maximum, or claim-time budget in `src/anxious_news_bot/digest/services/schedule.py`
-- [ ] T021 [P] [US1] Extend delivery projections and personal-news selection with internal user IDs, selection metadata, candidate-limit override, generic candidate filtering before evaluation, and grounded summary fallback while preserving `/news` in `src/anxious_news_bot/ranking/domain.py`, `src/anxious_news_bot/ranking/ports.py`, `src/anxious_news_bot/ranking/services/news.py`, and `src/anxious_news_bot/ranking/infrastructure/persistence.py`
-- [ ] T022 [P] [US1] Implement deterministic ranked-item grounding, exact composition validation, metadata merging, contiguous positions, and immutable content hashes in `src/anxious_news_bot/digest/services/content.py`
-- [ ] T023 [US1] Implement the versioned structured digest title/summary adapter using the shared model transport and typed transient/permanent failures in `src/anxious_news_bot/digest/infrastructure/llm.py`
-- [ ] T024 [P] [US1] Implement pure structured-digest rendering and basic acknowledged Telegram sending without ranking or translation logic in `src/anxious_news_bot/telegram/digest.py`
-- [ ] T025 [US1] Implement the successful execution path from attempt claim through filtered personal selection, zero-item completion, content persistence, part preparation, acknowledged delivery, and success recording in `src/anxious_news_bot/digest/services/execute.py`
-- [ ] T026 [US1] Implement the idempotent JobQueue timing adapter that invokes only due/retry application cycles in `src/anxious_news_bot/digest/infrastructure/scheduling.py`
-- [ ] T027 [US1] Wire digest repository, clock, history-free MVP filter, composer, execution service, Telegram delivery, and scheduler lifecycle into `src/anxious_news_bot/app.py`
+- [X] T020 [P] [US1] Implement daily timezone occurrence resolution, canonical occurrence keys, fold/gap policy, and multi-batch due draining until empty, per-tick claim maximum, or claim-time budget in `src/anxious_news_bot/digest/services/schedule.py`
+- [X] T021 [P] [US1] Extend delivery projections and personal-news selection with internal user IDs, selection metadata, candidate-limit override, generic candidate filtering before evaluation, and grounded summary fallback while preserving `/news` in `src/anxious_news_bot/ranking/domain.py`, `src/anxious_news_bot/ranking/ports.py`, `src/anxious_news_bot/ranking/services/news.py`, and `src/anxious_news_bot/ranking/infrastructure/persistence.py`
+- [X] T022 [P] [US1] Implement deterministic ranked-item grounding, exact composition validation, metadata merging, contiguous positions, and immutable content hashes in `src/anxious_news_bot/digest/services/content.py`
+- [X] T023 [US1] Implement the versioned structured digest title/summary adapter using the shared model transport and typed transient/permanent failures in `src/anxious_news_bot/digest/infrastructure/llm.py`
+- [X] T024 [P] [US1] Implement pure structured-digest rendering and basic acknowledged Telegram sending without ranking or translation logic in `src/anxious_news_bot/telegram/digest.py`
+- [X] T025 [US1] Implement the successful execution path from attempt claim through filtered personal selection, zero-item completion, content persistence, part preparation, acknowledged delivery, and success recording in `src/anxious_news_bot/digest/services/execute.py`
+- [X] T026 [US1] Implement the idempotent JobQueue timing adapter that invokes only due/retry application cycles in `src/anxious_news_bot/digest/infrastructure/scheduling.py`
+- [X] T027 [US1] Wire digest repository, clock, history-free MVP filter, composer, execution service, Telegram delivery, and scheduler lifecycle into `src/anxious_news_bot/app.py`
 
 **Checkpoint**: User Story 1 delivers scheduled personalized digests independently;
 history suppression and full retry hardening may still be added by User Story 3.
@@ -106,15 +106,15 @@ inputs and verify guidance with the previous value unchanged.
 
 ### Tests for User Story 2
 
-- [ ] T028 [P] [US2] Add failing configuration-service tests for 5/20 boundaries, invalid-value rejection before persistence, shared provisioner delegation, guaranteed disabled-safe configuration, and captured-count behavior in `tests/unit/digest/test_configuration.py`
-- [ ] T029 [P] [US2] Add failing Telegram `/count` tests for exact argument parsing, Russian/English/Spanish confirmations and guidance, missing update data, and controlled persistence failures in `tests/unit/telegram/test_count.py`
-- [ ] T030 [P] [US2] Add failing integration tests for atomic count update through the shared provisioner, first-command user creation, concurrent updates, user isolation, no-change on invalid input, and execution count snapshots that ignore later count changes in `tests/integration/digest/test_configuration.py`
+- [X] T028 [P] [US2] Add failing configuration-service tests for 5/20 boundaries, invalid-value rejection before persistence, shared provisioner delegation, guaranteed disabled-safe configuration, and captured-count behavior in `tests/unit/digest/test_configuration.py`
+- [X] T029 [P] [US2] Add failing Telegram `/count` tests for exact argument parsing, Russian/English/Spanish confirmations and guidance, missing update data, and controlled persistence failures in `tests/unit/telegram/test_count.py`
+- [X] T030 [P] [US2] Add failing integration tests for atomic count update through the shared provisioner, first-command user creation, concurrent updates, user isolation, no-change on invalid input, and execution count snapshots that ignore later count changes in `tests/integration/digest/test_configuration.py`
 
 ### Implementation for User Story 2
 
-- [ ] T031 [US2] Implement count validation and digest repository updates that invoke the shared application-user/profile/configuration provisioner without adding preference-domain coupling in `src/anxious_news_bot/digest/services/configuration.py` and `src/anxious_news_bot/digest/infrastructure/persistence.py`
-- [ ] T032 [US2] Implement the thin localized `/count` Telegram adapter with no persistence or scheduling logic in `src/anxious_news_bot/telegram/count.py`
-- [ ] T033 [US2] Register the `/count` service and command handler while preserving all existing handlers and application tests in `src/anxious_news_bot/app.py` and `tests/test_app.py`
+- [X] T031 [US2] Implement count validation and digest repository updates that invoke the shared application-user/profile/configuration provisioner without adding preference-domain coupling in `src/anxious_news_bot/digest/services/configuration.py` and `src/anxious_news_bot/digest/infrastructure/persistence.py`
+- [X] T032 [US2] Implement the thin localized `/count` Telegram adapter with no persistence or scheduling logic in `src/anxious_news_bot/telegram/count.py`
+- [X] T033 [US2] Register the `/count` service and command handler while preserving all existing handlers and application tests in `src/anxious_news_bot/app.py` and `tests/test_app.py`
 
 **Checkpoint**: User Story 2 works independently against the foundational digest
 configuration even when scheduled delivery is disabled.
@@ -135,21 +135,21 @@ no automatic resend.
 
 ### Tests for User Story 3
 
-- [ ] T034 [P] [US3] Add failing tests for versioned material-update production and history filtering across novelty qualification, baseline content delta, minimum text, same-event/publication guards, duplicate/review vetoes, stable order, hashes, threshold snapshots, and cached pair/policy decisions in `tests/unit/digest/test_material_updates.py` and `tests/unit/digest/test_history.py`
-- [ ] T035 [P] [US3] Add failing PostgreSQL tests for per-user history, atomic material-update evidence insertion/loading, pair/policy uniqueness, normalized-text and veto lookups, baseline content-delta eligibility, concurrent evaluation, acknowledgement uniqueness, and query bounds in `tests/integration/digest/test_delivery_history.py` and `tests/integration/digest/test_material_update_evidence.py`
-- [ ] T036 [P] [US3] Add failing retry-policy tests for stable execution/ranking IDs, exponential bounded delay, attempt exhaustion, phase resume without recomposition, typed transient/permanent outcomes, and stale-attempt rejection in `tests/unit/digest/test_retry.py`
-- [ ] T037 [P] [US3] Add failing delivery tests for part claim-before-send, acknowledged-part skipping, definitive retry of only pending parts, content-hash mismatch rejection, stale-sending ambiguity, provider message IDs, and terminal unknown state in `tests/integration/digest/test_delivery_idempotency.py`
-- [ ] T038 [P] [US3] Add failing cycle-isolation tests proving one user's model, ranking, persistence, permanent delivery, or ambiguous delivery failure cannot cancel another due user in `tests/integration/digest/test_user_isolation.py`
-- [ ] T039 [P] [US3] Add failing retention tests that preserve active/unknown evidence, enforce the freshness-horizon floor, and remove only expired terminal detail/history in `tests/unit/digest/test_retention.py` and `tests/integration/digest/test_retention.py`
+- [X] T034 [P] [US3] Add failing tests for versioned material-update production and history filtering across novelty qualification, baseline content delta, minimum text, same-event/publication guards, duplicate/review vetoes, stable order, hashes, threshold snapshots, and cached pair/policy decisions in `tests/unit/digest/test_material_updates.py` and `tests/unit/digest/test_history.py`
+- [X] T035 [P] [US3] Add failing PostgreSQL tests for per-user history, atomic material-update evidence insertion/loading, pair/policy uniqueness, normalized-text and veto lookups, baseline content-delta eligibility, concurrent evaluation, acknowledgement uniqueness, and query bounds in `tests/integration/digest/test_delivery_history.py` and `tests/integration/digest/test_material_update_evidence.py`
+- [X] T036 [P] [US3] Add failing retry-policy tests for stable execution/ranking IDs, exponential bounded delay, attempt exhaustion, phase resume without recomposition, typed transient/permanent outcomes, and stale-attempt rejection in `tests/unit/digest/test_retry.py`
+- [X] T037 [P] [US3] Add failing delivery tests for part claim-before-send, acknowledged-part skipping, definitive retry of only pending parts, content-hash mismatch rejection, stale-sending ambiguity, provider message IDs, and terminal unknown state in `tests/integration/digest/test_delivery_idempotency.py`
+- [X] T038 [P] [US3] Add failing cycle-isolation tests proving one user's model, ranking, persistence, permanent delivery, or ambiguous delivery failure cannot cancel another due user in `tests/integration/digest/test_user_isolation.py`
+- [X] T039 [P] [US3] Add failing retention tests that preserve active/unknown evidence, enforce the freshness-horizon floor, and remove only expired terminal detail/history in `tests/unit/digest/test_retention.py` and `tests/integration/digest/test_retention.py`
 
 ### Implementation for User Story 3
 
-- [ ] T040 [P] [US3] Implement the versioned deterministic material-update evidence producer using accepted novelty or canonical normalized-content similarity with duplicate/review vetoes, then consume its persisted outcome in history filtering in `src/anxious_news_bot/digest/services/material_updates.py` and `src/anxious_news_bot/digest/services/history.py`
-- [ ] T041 [US3] Implement atomic confirmed/uncertain history writes, material-update input loading and pair/policy evidence insertion, bounded history queries, per-part claims/acknowledgements, content-hash checks, and stale-sending reconciliation in `src/anxious_news_bot/digest/infrastructure/persistence.py`
-- [ ] T042 [US3] Add bounded retry scheduling, phase-aware resume, attempt exhaustion, permanent failure, terminal ambiguous delivery, and per-user isolation to `src/anxious_news_bot/digest/services/execute.py` and `src/anxious_news_bot/digest/services/schedule.py`
-- [ ] T043 [P] [US3] Classify Telegram acknowledgements, definite transient failures, permanent failures, and post-transmission ambiguity without logging provider bodies or content in `src/anxious_news_bot/telegram/digest.py`
-- [ ] T044 [US3] Integrate the real history filter and retry claims into personal selection and the timing adapter in `src/anxious_news_bot/app.py` and `src/anxious_news_bot/digest/infrastructure/scheduling.py`
-- [ ] T045 [US3] Implement digest attempt/detail/history retention and schedule it without deleting active retry or reconciliation evidence in `src/anxious_news_bot/digest/services/retention.py`, `src/anxious_news_bot/digest/infrastructure/persistence.py`, and `src/anxious_news_bot/app.py`
+- [X] T040 [P] [US3] Implement the versioned deterministic material-update evidence producer using accepted novelty or canonical normalized-content similarity with duplicate/review vetoes, then consume its persisted outcome in history filtering in `src/anxious_news_bot/digest/services/material_updates.py` and `src/anxious_news_bot/digest/services/history.py`
+- [X] T041 [US3] Implement atomic confirmed/uncertain history writes, material-update input loading and pair/policy evidence insertion, bounded history queries, per-part claims/acknowledgements, content-hash checks, and stale-sending reconciliation in `src/anxious_news_bot/digest/infrastructure/persistence.py`
+- [X] T042 [US3] Add bounded retry scheduling, phase-aware resume, attempt exhaustion, permanent failure, terminal ambiguous delivery, and per-user isolation to `src/anxious_news_bot/digest/services/execute.py` and `src/anxious_news_bot/digest/services/schedule.py`
+- [X] T043 [P] [US3] Classify Telegram acknowledgements, definite transient failures, permanent failures, and post-transmission ambiguity without logging provider bodies or content in `src/anxious_news_bot/telegram/digest.py`
+- [X] T044 [US3] Integrate the real history filter and retry claims into personal selection and the timing adapter in `src/anxious_news_bot/app.py` and `src/anxious_news_bot/digest/infrastructure/scheduling.py`
+- [X] T045 [US3] Implement digest attempt/detail/history retention and schedule it without deleting active retry or reconciliation evidence in `src/anxious_news_bot/digest/services/retention.py`, `src/anxious_news_bot/digest/infrastructure/persistence.py`, and `src/anxious_news_bot/app.py`
 
 **Checkpoint**: All stories pass independently and together, including
 idempotency, history, retry, ambiguity, and failure-isolation scenarios.
@@ -161,10 +161,10 @@ idempotency, history, retry, ambiguity, and failure-isolation scenarios.
 **Purpose**: Complete safe operations, documentation, regression, and measurable
 acceptance validation across all stories.
 
-- [ ] T046 [P] Add digest observability tests for redaction, safe reason codes, occurrence/user hashing, bounded fields, durations, and absence of prompts/article text/provider responses in `tests/unit/digest/test_observability.py` and `tests/unit/test_logging.py`
-- [ ] T047 [P] Document `/count`, disabled-safe schedule provisioning, digest environment settings, migration, retry/unknown semantics, and operating commands in `README.md`, `.env.example`, and `docker-compose.yml`
-- [ ] T048 Run the feature suite, full pytest suite, Ruff checks, migration upgrade/current verification, and quickstart acceptance scenarios; record any required corrections in `src/anxious_news_bot/`, `tests/`, and `specs/004-scheduler-digest/quickstart.md`
-- [ ] T049 After T001-T048 are complete, create the final technical documentation set with architecture and lifecycle diagrams, production/local setup, user workflows, contributor architecture/testing conventions, and an honest implementation retrospective covering what was completed, omitted, done well, limitations, and concrete improvements in `docs/architecture.md`, `docs/setup.md`, `docs/user-guide.md`, `docs/development.md`, and `docs/summary_spec_4.md`, then update the documentation index and feature overview in `README.md`
+- [X] T046 [P] Add digest observability tests for redaction, safe reason codes, occurrence/user hashing, bounded fields, durations, and absence of prompts/article text/provider responses in `tests/unit/digest/test_observability.py` and `tests/unit/test_logging.py`
+- [X] T047 [P] Document `/count`, disabled-safe schedule provisioning, digest environment settings, migration, retry/unknown semantics, and operating commands in `README.md`, `.env.example`, and `docker-compose.yml`
+- [X] T048 Run the feature suite, full pytest suite, Ruff checks, migration upgrade/current verification, and quickstart acceptance scenarios; record any required corrections in `src/anxious_news_bot/`, `tests/`, and `specs/004-scheduler-digest/quickstart.md`
+- [X] T049 After T001-T048 are complete, create the final technical documentation set with architecture and lifecycle diagrams, production/local setup, user workflows, contributor architecture/testing conventions, and an honest implementation retrospective covering what was completed, omitted, done well, limitations, and concrete improvements in `docs/architecture.md`, `docs/setup.md`, `docs/user-guide.md`, `docs/development.md`, and `docs/summary_spec_4.md`, then update the documentation index and feature overview in `README.md`
 
 ---
 

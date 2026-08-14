@@ -34,8 +34,32 @@ class ArticlePreferenceEvaluator(Protocol):
 
 
 @runtime_checkable
+class CandidateFilterOutcome(Protocol):
+    """Structural result of a generic candidate filter.
+
+    Any object exposing ``eligible_article_ids`` (preserving the input
+    candidate order) satisfies this protocol, including richer filter results
+    such as the digest module's delivery-history filter outcome.
+    """
+
+    eligible_article_ids: Sequence[UUID]
+
+
+@runtime_checkable
+class CandidateFilter(Protocol):
+    async def filter(
+        self,
+        user_id: UUID,
+        candidate_ids: Sequence[UUID],
+        ranking_at: datetime,
+    ) -> CandidateFilterOutcome: ...
+
+
+@runtime_checkable
 class RankingRepository(Protocol):
     async def resolve_user_id(self, telegram_user_id: int) -> UUID | None: ...
+
+    async def resolve_profile_revision(self, user_id: UUID) -> int: ...
 
     async def prepare_delivery_candidates(
         self,

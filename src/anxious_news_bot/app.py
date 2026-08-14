@@ -2,6 +2,7 @@ import logging
 from decimal import Decimal
 
 import httpx
+from apscheduler.jobstores.base import JobLookupError
 from telegram import Update
 from telegram.ext import (
     Application,
@@ -11,6 +12,25 @@ from telegram.ext import (
 )
 
 from anxious_news_bot.config import Settings
+from anxious_news_bot.digest.domain import RetrySchedule, validate_local_time
+from anxious_news_bot.digest.infrastructure.llm import StructuredDigestComposer
+from anxious_news_bot.digest.infrastructure.persistence import (
+    SQLAlchemyDigestRepository,
+)
+from anxious_news_bot.digest.infrastructure.scheduling import (
+    DigestRetentionScheduler,
+    DigestSchedulingAdapter,
+)
+from anxious_news_bot.digest.services.configuration import DigestConfigurationService
+from anxious_news_bot.digest.services.execute import DigestExecutionService
+from anxious_news_bot.digest.services.history import DigestHistoryFilter
+from anxious_news_bot.digest.services.material_updates import MaterialUpdatePolicy
+from anxious_news_bot.digest.services.retention import DigestRetentionService
+from anxious_news_bot.infrastructure.structured_model import StructuredModelTransport
+from anxious_news_bot.infrastructure.users import (
+    ApplicationUserProvisioner,
+    DigestDefaults,
+)
 from anxious_news_bot.logging import configure_logging
 from anxious_news_bot.news.domain import SourceType
 from anxious_news_bot.news.infrastructure.database import Database
@@ -85,6 +105,8 @@ from anxious_news_bot.ranking.services.news import PersonalNewsService
 from anxious_news_bot.ranking.services.rank import PersonalRankingService
 from anxious_news_bot.ranking.services.retention import RankingRetentionService
 from anxious_news_bot.ranking.services.score import DeterministicRankingScorer
+from anxious_news_bot.telegram.count import CountTelegramAdapter
+from anxious_news_bot.telegram.digest import TelegramDigestDelivery
 from anxious_news_bot.telegram.language import (
     CALLBACK_PREFIX as LANGUAGE_CALLBACK_PREFIX,
 )
@@ -96,6 +118,16 @@ from anxious_news_bot.telegram.tune import CALLBACK_PREFIX, TuneTelegramAdapter
 
 LOGGER = logging.getLogger(__name__)
 START_MESSAGE = "The bot is running. News features will be added soon."
+
+
+def _stop_scheduler(scheduler: object | None) -> None:
+    if scheduler is None:
+        return
+    try:
+        scheduler.stop()
+    except JobLookupError:
+        # Application.stop() may already have removed JobQueue jobs.
+        LOGGER.debug("scheduler_job_already_removed")
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -173,11 +205,19 @@ def build_application(settings: Settings) -> Application:
         max_concurrency=settings.news_max_concurrency,
         configuration_version=settings.news_url_policy_version,
     )
+    user_provisioner = ApplicationUserProvisioner(
+        DigestDefaults(
+            count=settings.digest_default_count,
+            local_time=validate_local_time(settings.digest_default_local_time),
+            timezone_name=settings.digest_default_timezone,
+        )
+    )
     preference_repository = SQLAlchemyPreferenceRepository(
         database,
         history_context_limit=settings.preferences_history_question_limit,
         duplicate_threshold=settings.preferences_duplicate_review_threshold,
         explicit_history_limit=settings.preferences_explicit_history_limit,
+        user_provisioner=user_provisioner,
     )
     preference_model = StructuredPreferenceModelAdapter(
         client,
@@ -295,6 +335,67 @@ def build_application(settings: Settings) -> Application:
         batch_size=settings.ranking_retention_batch_size,
     )
 
+    # Digest module
+    digest_repository = SQLAlchemyDigestRepository(
+        database,
+        user_provisioner=user_provisioner,
+    )
+    digest_model_transport = StructuredModelTransport(
+        client,
+        base_url=settings.ranking_model_base_url,
+        api_key=settings.ranking_model_api_key,
+        model=settings.ranking_model_name,
+        timeout_seconds=settings.ranking_model_timeout_seconds,
+        retry_attempts=settings.ranking_model_retry_attempts,
+        max_response_bytes=settings.ranking_model_max_response_bytes,
+    )
+    digest_composer = StructuredDigestComposer(digest_model_transport)
+    digest_history_filter = DigestHistoryFilter(
+        digest_repository,
+        policy=MaterialUpdatePolicy(
+            version=settings.digest_material_update_policy_version,
+            novelty_threshold=settings.digest_material_update_novelty_threshold,
+            max_content_similarity=(
+                settings.digest_material_update_max_content_similarity
+            ),
+            min_text_chars=settings.digest_material_update_min_text_chars,
+        ),
+    )
+    digest_delivery = TelegramDigestDelivery()
+    digest_retry_schedule = RetrySchedule(
+        base_seconds=settings.digest_retry_base_seconds,
+        max_seconds=settings.digest_retry_max_seconds,
+        max_attempts=settings.digest_max_attempts,
+    )
+    digest_clock = PreferenceClock()
+    digest_execution_service = DigestExecutionService(
+        config_repository=digest_repository,
+        execution_repository=digest_repository,
+        personal_news_selector=personal_news_service,
+        composer=digest_composer,
+        delivery=digest_delivery,
+        candidate_filter=digest_history_filter,
+        clock=digest_clock,
+        retry_schedule=digest_retry_schedule,
+        user_concurrency=settings.digest_user_concurrency,
+        candidate_limit=settings.digest_candidate_limit,
+        renderer_version=settings.digest_renderer_version,
+        claim_batch_size=settings.digest_claim_batch_size,
+        max_claims_per_tick=settings.digest_max_claims_per_tick,
+        claim_time_budget_seconds=settings.digest_claim_time_budget_seconds,
+        content_max_input_chars=settings.digest_content_max_input_chars,
+    )
+    digest_config_service = DigestConfigurationService(digest_repository, digest_clock)
+    count_adapter = CountTelegramAdapter(
+        digest_config_service,
+        language_service,
+    )
+    digest_retention_service = DigestRetentionService(
+        digest_repository,
+        digest_clock,
+        history_retention_days=settings.digest_history_retention_days,
+    )
+
     async def post_init(application: Application) -> None:
         if application.job_queue is None:
             raise RuntimeError("Telegram JobQueue is required")
@@ -321,22 +422,41 @@ def build_application(settings: Settings) -> Application:
             ranking_retention_scheduler
         )
         ranking_retention_scheduler.start()
+        digest_delivery.bind(application.bot)
+        digest_scheduler = DigestSchedulingAdapter(
+            application.job_queue,
+            digest_execution_service,
+            digest_clock,
+            interval_seconds=settings.digest_scan_interval_seconds,
+        )
+        application.bot_data["digest_scheduler"] = digest_scheduler
+        digest_scheduler.start()
+        digest_retention_scheduler = DigestRetentionScheduler(
+            application.job_queue,
+            digest_retention_service,
+        )
+        application.bot_data["digest_retention_scheduler"] = digest_retention_scheduler
+        digest_retention_scheduler.start()
 
     async def post_shutdown(application: Application) -> None:
         scheduler = application.bot_data.pop("news_scheduler", None)
-        if scheduler is not None:
-            scheduler.stop()
+        _stop_scheduler(scheduler)
         retention_scheduler = application.bot_data.pop(
             "preference_retention_scheduler", None
         )
-        if retention_scheduler is not None:
-            retention_scheduler.stop()
+        _stop_scheduler(retention_scheduler)
         ranking_retention_scheduler = application.bot_data.pop(
             "ranking_retention_scheduler",
             None,
         )
-        if ranking_retention_scheduler is not None:
-            ranking_retention_scheduler.stop()
+        _stop_scheduler(ranking_retention_scheduler)
+        digest_sched = application.bot_data.pop("digest_scheduler", None)
+        _stop_scheduler(digest_sched)
+        digest_retention_sched = application.bot_data.pop(
+            "digest_retention_scheduler",
+            None,
+        )
+        _stop_scheduler(digest_retention_sched)
         await client.aclose()
         await database.close()
 
@@ -352,6 +472,7 @@ def build_application(settings: Settings) -> Application:
     application.add_handler(CommandHandler("news", news_adapter.command))
     application.add_handler(CommandHandler("tune", tune_adapter.command))
     application.add_handler(CommandHandler("specify", specify_adapter.command))
+    application.add_handler(CommandHandler("count", count_adapter.command))
     application.add_handler(
         CallbackQueryHandler(
             language_adapter.callback,
@@ -375,6 +496,9 @@ def build_application(settings: Settings) -> Application:
     application.bot_data["personal_news_service"] = personal_news_service
     application.bot_data["ranking_repository"] = ranking_repository
     application.bot_data["ranking_evaluator"] = ranking_evaluator
+    application.bot_data["digest_repository"] = digest_repository
+    application.bot_data["digest_execution_service"] = digest_execution_service
+    application.bot_data["digest_configuration_service"] = digest_config_service
     return application
 
 

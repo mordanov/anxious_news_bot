@@ -76,6 +76,17 @@ from anxious_news_bot.ranking.services.evaluate import (
 from anxious_news_bot.ranking.services.explain import top_contributions
 from anxious_news_bot.ranking.services.rank import candidate_snapshot_hash
 
+_SUMMARY_MAX_LENGTH = 4000
+
+
+def _truncate_summary(summary: str | None) -> str | None:
+    """Truncate summary to maximum allowed length for RankingArticleSnapshot."""
+    if summary is None:
+        return None
+    if len(summary) > _SUMMARY_MAX_LENGTH:
+        return summary[:_SUMMARY_MAX_LENGTH]
+    return summary
+
 
 class SQLAlchemyRankingRepository:
     def __init__(self, database: Database) -> None:
@@ -347,7 +358,7 @@ class SQLAlchemyRankingRepository:
                 else None,
                 duplicate_outcome=duplicate_outcome,
                 title=article.title,
-                summary=article.summary,
+                summary=_truncate_summary(article.summary),
                 normalized_text=article.normalized_text,
                 language_code=article.language_code,
             )
@@ -610,7 +621,7 @@ class SQLAlchemyRankingRepository:
                         else None,
                         duplicate_outcome=duplicate_outcomes.get(article.id),
                         title=article.title,
-                        summary=article.summary,
+                        summary=_truncate_summary(article.summary),
                         normalized_text=article.normalized_text,
                         language_code=article.language_code,
                         evaluation_run_id=evaluations.get(article.id).run_id
@@ -1491,7 +1502,7 @@ class SQLAlchemyRankingRepository:
                     else None,
                     duplicate_outcome=duplicates.get(article.id),
                     title=article.title,
-                    summary=article.summary,
+                    summary=_truncate_summary(article.summary),
                     normalized_text=article.normalized_text,
                     language_code=article.language_code,
                     evaluation_run_id=evaluations.get(article.id).run_id

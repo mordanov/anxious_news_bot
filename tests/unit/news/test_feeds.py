@@ -79,6 +79,33 @@ async def test_feed_fetcher_sends_conditional_headers_and_handles_304() -> None:
     assert result.records == ()
 
 
+async def test_feed_fetcher_follows_feed_redirects() -> None:
+    body = (FIXTURES / "valid_rss.xml").read_bytes()
+    requests: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(str(request.url))
+        if len(requests) == 1:
+            return httpx.Response(
+                301,
+                headers={"Location": "https://feeds.example.test/redirected"},
+                request=request,
+            )
+        return httpx.Response(200, content=body, request=request)
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        result = await FeedFetcher(client, retry_attempts=1).fetch(
+            source(), ConditionalHeaders()
+        )
+
+    assert result.status is FetchStatus.FETCHED
+    assert len(result.records) == 2
+    assert requests == [
+        "https://feeds.example.test/news",
+        "https://feeds.example.test/redirected",
+    ]
+
+
 async def test_feed_fetcher_retries_transient_responses() -> None:
     attempts = 0
 

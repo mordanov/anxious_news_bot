@@ -78,7 +78,11 @@ class FeedFetcher:
         response: httpx.Response | None = None
         for attempt in range(1, self._retry_attempts + 1):
             try:
-                response = await self._client.get(source.endpoint_url, headers=headers)
+                response = await self._client.get(
+                    source.endpoint_url,
+                    headers=headers,
+                    follow_redirects=True,
+                )
             except asyncio.CancelledError:
                 raise
             except httpx.TimeoutException as exc:

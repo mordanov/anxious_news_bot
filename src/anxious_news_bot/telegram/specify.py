@@ -21,6 +21,7 @@ MESSAGES = {
         "processing": "Обрабатываю ваше предпочтение...",
         "invalid": "Я не смог преобразовать это в безопасное изменение предпочтений.",
         "failed": "Обновление предпочтений не удалось. Попробуйте позже.",
+        "applied": "Ваше явное предпочтение сохранено.",
         "no_change": "Ваши текущие предпочтения уже охватывают этот запрос.",
         "stale_retry": "Ваш профиль изменился во время обработки, поэтому я повторяю попытку.",
         "length_exceeded": "Пожалуйста, держите запросы /specify в пределах {max_length} символов.",
@@ -30,6 +31,7 @@ MESSAGES = {
         "processing": "Interpreting your explicit preference...",
         "invalid": "I couldn't convert that into a safe preference change.",
         "failed": "Preference update failed. Please try again soon.",
+        "applied": "Saved your explicit preference.",
         "no_change": "Your current preferences already cover this request.",
         "stale_retry": "Your profile changed while I was working, so I'm retrying once.",
         "length_exceeded": "Please keep /specify requests within {max_length} characters.",
@@ -39,6 +41,7 @@ MESSAGES = {
         "processing": "Interpretando tu preferencia explícita...",
         "invalid": "No pude convertir eso en un cambio de preferencia seguro.",
         "failed": "La actualización de preferencias falló. Inténtalo de nuevo más tarde.",
+        "applied": "Tu preferencia explícita se ha guardado.",
         "no_change": "Tus preferencias actuales ya cubren esta solicitud.",
         "stale_retry": "Tu perfil cambió mientras estaba trabajando, así que estoy reintentando.",
         "length_exceeded": "Por favor, mantén las solicitudes /specify dentro de {max_length} caracteres.",
@@ -117,8 +120,7 @@ class SpecifyTelegramAdapter:
         messages = MESSAGES[language]
         state_messages = {
             SpecifyStateKind.PROCESSING: messages["processing"],
-            SpecifyStateKind.APPLIED: state.message
-            or "Saved your explicit preference.",
+            SpecifyStateKind.APPLIED: state.message or messages["applied"],
             SpecifyStateKind.NO_CHANGE: state.message or messages["no_change"],
             SpecifyStateKind.INVALID: state.message or messages["invalid"],
             SpecifyStateKind.STALE_RETRY: state.message or messages["stale_retry"],

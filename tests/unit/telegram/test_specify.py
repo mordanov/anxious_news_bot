@@ -104,6 +104,17 @@ async def test_renders_all_specify_states(state: SpecifyState, expected: str) ->
     reply.assert_awaited_once_with(expected)
 
 
+async def test_applied_fallback_uses_selected_language() -> None:
+    reply = AsyncMock()
+    state = SpecifyState(SpecifyStateKind.APPLIED, request_id=uuid4())
+
+    await SpecifyTelegramAdapter._render_message(
+        reply, state, SupportedLanguage.SPANISH
+    )
+
+    reply.assert_awaited_once_with("Tu preferencia explícita se ha guardado.")
+
+
 async def test_missing_user_or_message_is_ignored() -> None:
     service = Mock()
     service.specify = AsyncMock()

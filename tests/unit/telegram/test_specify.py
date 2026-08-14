@@ -7,9 +7,9 @@ from uuid import uuid4
 import pytest
 
 from anxious_news_bot.preferences.domain import (
-    SupportedLanguage,
     SpecifyState,
     SpecifyStateKind,
+    SupportedLanguage,
 )
 from anxious_news_bot.telegram.specify import SpecifyTelegramAdapter
 
@@ -121,9 +121,7 @@ async def test_blank_and_over_limit_text_return_controlled_messages() -> None:
     service.specify = AsyncMock()
     language_service = AsyncMock()
     language_service.get = AsyncMock(return_value=SupportedLanguage.ENGLISH)
-    adapter = SpecifyTelegramAdapter(
-        service, language_service, max_text_length=10
-    )
+    adapter = SpecifyTelegramAdapter(service, language_service, max_text_length=10)
 
     blank_message = Mock(text="/specify    ")
     blank_message.reply_text = AsyncMock()
@@ -164,9 +162,7 @@ async def test_logs_exclude_raw_statement_text(caplog) -> None:
     service.specify = AsyncMock()
     language_service = AsyncMock()
     language_service.get = AsyncMock(return_value=SupportedLanguage.ENGLISH)
-    adapter = SpecifyTelegramAdapter(
-        service, language_service, max_text_length=10
-    )
+    adapter = SpecifyTelegramAdapter(service, language_service, max_text_length=10)
     raw_text = "/specify Very sensitive Kirov statement"
     message = Mock(text=raw_text)
     message.reply_text = AsyncMock()

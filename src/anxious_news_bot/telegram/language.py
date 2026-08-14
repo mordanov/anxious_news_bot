@@ -25,6 +25,11 @@ LANGUAGE_CHANGED = {
     SupportedLanguage.ENGLISH: "Language changed to English. Send /tune to begin.",
     SupportedLanguage.SPANISH: "Idioma cambiado a Español. Envía /tune para comenzar.",
 }
+INVALID_SELECTION = {
+    SupportedLanguage.RUSSIAN: "Неверный выбор языка.",
+    SupportedLanguage.ENGLISH: "Invalid language selection.",
+    SupportedLanguage.SPANISH: "Selección de idioma inválida.",
+}
 
 
 class LanguageTelegramAdapter:
@@ -58,16 +63,23 @@ class LanguageTelegramAdapter:
             return
         await query.answer()
         data = query.data
+        
+        # Get user's current language for error messages
+        if user is not None:
+            current_language = await self._service.get(user.id, user.language_code)
+        else:
+            current_language = SupportedLanguage.ENGLISH
+        
         if (
             user is None
             or not isinstance(data, str)
             or not data.startswith(CALLBACK_PREFIX)
         ):
-            await query.edit_message_text("Invalid language selection.")
+            await query.edit_message_text(INVALID_SELECTION[current_language])
             return
         code = data.removeprefix(CALLBACK_PREFIX)
         if code not in {language.value for language in SupportedLanguage}:
-            await query.edit_message_text("Invalid language selection.")
+            await query.edit_message_text(INVALID_SELECTION[current_language])
             return
         language = await self._service.set(user.id, code)
         await query.edit_message_text(LANGUAGE_CHANGED[language])

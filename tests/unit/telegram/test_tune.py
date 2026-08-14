@@ -40,13 +40,41 @@ async def test_callback_is_acknowledged_before_controlled_stale_response() -> No
     query = Mock(data=f"{CALLBACK_PREFIX}opaque")
     query.answer = AsyncMock()
     query.edit_message_text = AsyncMock()
+    query.delete_message = AsyncMock()
+    status_message = Mock(edit_text=AsyncMock())
+    query.message = Mock(chat=Mock(send_message=AsyncMock(return_value=status_message)))
     update = Mock(
         callback_query=query,
         effective_user=Mock(id=123, language_code="en"),
     )
     await adapter.callback(update, Mock())
     query.answer.assert_awaited_once_with()
-    query.edit_message_text.assert_awaited_once()
+    status_message.edit_text.assert_awaited_once()
+
+
+async def test_callback_replaces_question_with_processing_before_completion() -> None:
+    service = Mock()
+    service.answer = AsyncMock(
+        return_value=TuneState(TuneStateKind.COMPLETED, questionnaire_id=None)
+    )
+    adapter = _adapter(service)
+    status_message = Mock(edit_text=AsyncMock())
+    chat = Mock(send_message=AsyncMock(return_value=status_message))
+    query = Mock(data=f"{CALLBACK_PREFIX}opaque", message=Mock(chat=chat))
+    query.answer = AsyncMock()
+    query.delete_message = AsyncMock()
+    update = Mock(
+        callback_query=query,
+        effective_user=Mock(id=123, language_code="en"),
+    )
+
+    await adapter.callback(update, Mock())
+
+    query.delete_message.assert_awaited_once_with()
+    chat.send_message.assert_awaited_once_with("Updating your preferences...")
+    status_message.edit_text.assert_awaited_once_with(
+        "Your news preferences have been updated."
+    )
 
 
 async def test_command_without_user_or_message_is_ignored() -> None:

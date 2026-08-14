@@ -92,27 +92,31 @@ class TuneTelegramAdapter:
             )
             return
         language = await self._language_service.get(user.id, user.language_code)
+        if query.message is None:
+            LOGGER.warning("tune_callback_missing_message")
+            return
+        await query.delete_message()
+        status_message = await query.message.chat.send_message(
+            MESSAGES[language]["processing"]
+        )
         try:
             state = await self._service.answer(
                 user.id, data.removeprefix(CALLBACK_PREFIX)
             )
         except AnswerRejected:
-            await query.edit_message_text(MESSAGES[language]["stale"])
+            await status_message.edit_text(MESSAGES[language]["stale"])
             return
 
-        # If still asking a question, edit the message
         if state.kind is TuneStateKind.QUESTION:
-            await self._render_message(query.edit_message_text, state, language)
+            await self._render_message(status_message.edit_text, state, language)
         else:
-            # Delete the question and send a new message for processing/completed states
-            await query.delete_message()
             state_messages = {
                 TuneStateKind.GENERATING: MESSAGES[language]["generating"],
                 TuneStateKind.PROCESSING: MESSAGES[language]["processing"],
                 TuneStateKind.COMPLETED: MESSAGES[language]["completed"],
                 TuneStateKind.FAILED: MESSAGES[language]["failed"],
             }
-            await query.message.chat.send_message(state_messages[state.kind])
+            await status_message.edit_text(state_messages[state.kind])
 
     @staticmethod
     async def _render_message(

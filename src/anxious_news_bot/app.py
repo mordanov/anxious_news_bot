@@ -107,6 +107,7 @@ from anxious_news_bot.ranking.services.retention import RankingRetentionService
 from anxious_news_bot.ranking.services.score import DeterministicRankingScorer
 from anxious_news_bot.telegram.count import CountTelegramAdapter
 from anxious_news_bot.telegram.digest import TelegramDigestDelivery
+from anxious_news_bot.telegram.help import HelpTelegramAdapter
 from anxious_news_bot.telegram.language import (
     CALLBACK_PREFIX as LANGUAGE_CALLBACK_PREFIX,
 )
@@ -126,6 +127,7 @@ _BOT_COMMANDS = [
     BotCommand("tune", "Customize your preferences"),
     BotCommand("specify", "Add an explicit preference"),
     BotCommand("count", "Set digest size (5-20)"),
+    BotCommand("help", "Show available commands"),
 ]
 
 
@@ -272,6 +274,7 @@ def build_application(settings: Settings) -> Application:
     )
     tune_adapter = TuneTelegramAdapter(tuning_service, language_service)
     language_adapter = LanguageTelegramAdapter(language_service)
+    help_adapter = HelpTelegramAdapter(language_service)
     specify_adapter = SpecifyTelegramAdapter(
         specify_service,
         max_text_length=settings.preferences_explicit_request_max_length,
@@ -480,6 +483,7 @@ def build_application(settings: Settings) -> Application:
     )
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("language", language_adapter.command))
+    application.add_handler(CommandHandler("help", help_adapter.command))
     application.add_handler(CommandHandler("news", news_adapter.command))
     application.add_handler(CommandHandler("tune", tune_adapter.command))
     application.add_handler(CommandHandler("specify", specify_adapter.command))

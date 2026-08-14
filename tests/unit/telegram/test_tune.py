@@ -2,6 +2,9 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock, Mock
 
+import pytest
+from telegram.error import BadRequest
+
 from anxious_news_bot.preferences.domain import (
     SupportedLanguage,
     TuneOption,
@@ -75,6 +78,51 @@ async def test_callback_replaces_question_with_processing_before_completion() ->
     status_message.edit_text.assert_awaited_once_with(
         "Your news preferences have been updated."
     )
+
+
+async def test_expired_callback_acknowledgement_does_not_discard_answer() -> None:
+    service = Mock(
+        answer=AsyncMock(
+            return_value=TuneState(TuneStateKind.COMPLETED, questionnaire_id=None)
+        )
+    )
+    adapter = _adapter(service)
+    status_message = Mock(edit_text=AsyncMock())
+    chat = Mock(send_message=AsyncMock(return_value=status_message))
+    query = Mock(data=f"{CALLBACK_PREFIX}opaque", message=Mock(chat=chat))
+    query.answer = AsyncMock(
+        side_effect=BadRequest(
+            "Query is too old and response timeout expired or query id is invalid"
+        )
+    )
+    query.delete_message = AsyncMock()
+    update = Mock(
+        callback_query=query,
+        effective_user=Mock(id=123, language_code="en"),
+    )
+
+    await adapter.callback(update, Mock())
+
+    service.answer.assert_awaited_once_with(123, "opaque")
+    status_message.edit_text.assert_awaited_once_with(
+        "Your news preferences have been updated."
+    )
+
+
+async def test_unrelated_callback_bad_request_is_not_hidden() -> None:
+    service = Mock(answer=AsyncMock())
+    adapter = _adapter(service)
+    query = Mock(data=f"{CALLBACK_PREFIX}opaque")
+    query.answer = AsyncMock(side_effect=BadRequest("Message is not modified"))
+    update = Mock(
+        callback_query=query,
+        effective_user=Mock(id=123, language_code="en"),
+    )
+
+    with pytest.raises(BadRequest, match="Message is not modified"):
+        await adapter.callback(update, Mock())
+
+    service.answer.assert_not_awaited()
 
 
 async def test_command_without_user_or_message_is_ignored() -> None:

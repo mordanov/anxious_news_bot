@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram.error import BadRequest
 from telegram.ext import ContextTypes
 
 from anxious_news_bot.preferences.domain import (
@@ -79,7 +80,22 @@ class TuneTelegramAdapter:
         if query is None:
             LOGGER.warning("tune_callback_missing_query")
             return
-        await query.answer()
+        try:
+            await query.answer()
+        except BadRequest as exc:
+            message = str(exc).lower()
+            if "query is too old" not in message and "query id is invalid" not in message:
+                raise
+            LOGGER.info(
+                "tune_callback_acknowledgement_expired",
+                extra={
+                    "preference": {
+                        "stage": "callback_acknowledgement",
+                        "status": "expired",
+                        "error_code": "callback_query_expired",
+                    }
+                },
+            )
         user = update.effective_user
         data = query.data
         if (

@@ -61,6 +61,10 @@ async def test_news_command_renders_ranked_articles() -> None:
     )
     assert "1. Important translated update" in rendered
     assert "https://example.com/story" in rendered
+    assert reply.await_args_list[1].args == (
+        "Only 1 of 7 news items were available. "
+        "Run /tune to review or update your preferences.",
+    )
 
 
 async def test_news_command_reports_translation_failure() -> None:

@@ -352,6 +352,104 @@ async def test_rank_retains_missing_analysis_candidate_as_ineligible(
         "eligible": 1,
         "missing_generic_analysis": 1,
     }
+    assert summary.kwargs["fields"]["incomplete_personal_evaluation_details"] == ()
+
+
+@pytest.mark.asyncio
+async def test_rank_logs_explicit_veto_signal_without_preference_text(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    event_log = Mock()
+    monkeypatch.setattr(
+        "anxious_news_bot.ranking.services.rank.log_ranking_event",
+        event_log,
+    )
+    user_id = _uuid(24)
+    preference = ranking_preference(
+        parameter_id=_uuid(4),
+        user_id=user_id,
+        name="Private preference name",
+        weight="0.80",
+    )
+    article = article_snapshot(
+        article_id=_uuid(142),
+        article_analysis_id=_uuid(242),
+        source_id=_uuid(342),
+        published_at=FixedClock.value,
+    )
+    service = _service(
+        (
+            3,
+            (preference,),
+            (article,),
+            (_evaluation(article, (preference,), relevance="-0.7500"),),
+        )
+    )
+
+    result = await service.rank(
+        user_id,
+        "request-explicit-veto",
+        (article.article_id,),
+        requested_count=1,
+        ranking_at=FixedClock.value,
+    )
+
+    assert result.records[0].eligibility_reason is EligibilityReason.EXPLICIT_VETO
+    summary = next(
+        call
+        for call in event_log.call_args_list
+        if call.args == ("ranking_eligibility_summary",)
+    )
+    details = summary.kwargs["fields"]["explicit_veto_details"]
+    assert len(details) == 1
+    assert str(article.article_id) in details[0]
+    assert str(preference.id) in details[0]
+    assert "weight=0.80" in details[0]
+    assert "relevance=-0.7500" in details[0]
+    assert "Private preference name" not in details[0]
+
+
+@pytest.mark.asyncio
+async def test_rank_logs_incomplete_personal_evaluation_counts(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    event_log = Mock()
+    monkeypatch.setattr(
+        "anxious_news_bot.ranking.services.rank.log_ranking_event",
+        event_log,
+    )
+    user_id = _uuid(25)
+    preference = ranking_preference(parameter_id=_uuid(5), user_id=user_id)
+    article = article_snapshot(
+        article_id=_uuid(143),
+        article_analysis_id=_uuid(243),
+        source_id=_uuid(343),
+        published_at=FixedClock.value,
+    )
+    service = _service((3, (preference,), (article,), ()))
+
+    result = await service.rank(
+        user_id,
+        "request-incomplete-evaluation",
+        (article.article_id,),
+        requested_count=1,
+        ranking_at=FixedClock.value,
+    )
+
+    assert (
+        result.records[0].eligibility_reason
+        is EligibilityReason.INCOMPLETE_PERSONAL_EVALUATION
+    )
+    summary = next(
+        call
+        for call in event_log.call_args_list
+        if call.args == ("ranking_eligibility_summary",)
+    )
+    details = summary.kwargs["fields"]["incomplete_personal_evaluation_details"]
+    assert details == (
+        f"article={article.article_id},evaluation_status=missing,"
+        "expected=1,found=0,missing=1,unexpected=0",
+    )
 
 
 @pytest.mark.asyncio

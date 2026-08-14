@@ -25,18 +25,30 @@ MESSAGES = {
         "empty": "Подходящих свежих новостей пока нет.",
         "failed": "Не удалось составить подборку новостей. Попробуйте позже.",
         "header": "Ваши главные новости",
+        "shortage": (
+            "Получено только {actual} из {requested} новостей. "
+            "Запустите /tune, чтобы проверить или обновить предпочтения."
+        ),
     },
     SupportedLanguage.ENGLISH: {
         "processing": "Selecting news for you...",
         "empty": "There are no suitable fresh articles yet.",
         "failed": "I couldn't prepare your news selection. Please try again later.",
         "header": "Your top news",
+        "shortage": (
+            "Only {actual} of {requested} news items were available. "
+            "Run /tune to review or update your preferences."
+        ),
     },
     SupportedLanguage.SPANISH: {
         "processing": "Seleccionando noticias para ti...",
         "empty": "Todavía no hay noticias recientes adecuadas.",
         "failed": "No pude preparar tus noticias. Inténtalo de nuevo más tarde.",
         "header": "Tus noticias principales",
+        "shortage": (
+            "Solo había {actual} de {requested} noticias disponibles. "
+            "Usa /tune para revisar o actualizar tus preferencias."
+        ),
     },
 }
 
@@ -105,6 +117,10 @@ class NewsTelegramAdapter:
         await status_message.edit_text(chunks[0])
         for chunk in chunks[1:]:
             await message.reply_text(chunk)
+        if len(items) < count:
+            await message.reply_text(
+                text["shortage"].format(actual=len(items), requested=count)
+            )
 
     @classmethod
     def _chunks(

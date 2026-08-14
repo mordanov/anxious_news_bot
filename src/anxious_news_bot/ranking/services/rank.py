@@ -3,14 +3,20 @@ from __future__ import annotations
 import hashlib
 import json
 from collections import Counter
+from collections.abc import Sequence
 from datetime import datetime
 from decimal import Decimal
 from uuid import UUID, uuid4
 
+from anxious_news_bot.preferences.domain import PreferenceOrigin
 from anxious_news_bot.ranking.domain import (
     ArticleEvaluation,
+    EligibilityReason,
+    EvaluationStatus,
     RankingArticleSnapshot,
+    RankingConfiguration,
     RankingIdentity,
+    RankingPreference,
     RankingRecord,
     RankingResult,
     RankingStatus,
@@ -67,6 +73,79 @@ def _selected_records(records: tuple[RankingRecord, ...]) -> tuple[RankingRecord
             key=lambda item: item.selection.position or 0,
         )
     )
+
+
+def _explicit_veto_details(
+    records: Sequence[RankingRecord],
+    configuration: RankingConfiguration,
+) -> tuple[str, ...]:
+    details: list[str] = []
+    for record in records:
+        if not record.explicit_veto:
+            continue
+        for contribution in record.contributions:
+            if (
+                contribution.effective_authority is not PreferenceOrigin.EXPLICIT
+                or abs(contribution.weight)
+                < configuration.explicit_weight_threshold
+            ):
+                continue
+            alignment = (
+                contribution.relevance
+                if contribution.weight >= 0
+                else -contribution.relevance
+            )
+            if alignment > -configuration.explicit_relevance_threshold:
+                continue
+            details.append(
+                f"article={record.article_id},parameter={contribution.parameter_id},"
+                f"weight={contribution.weight},relevance={contribution.relevance},"
+                f"alignment={alignment}"
+            )
+            if len(details) >= 10:
+                return tuple(details)
+    return tuple(details)
+
+
+def _incomplete_evaluation_details(
+    records: Sequence[RankingRecord],
+    preferences: Sequence[RankingPreference],
+    evaluations: Sequence[ArticleEvaluation],
+) -> tuple[str, ...]:
+    expected_ids = {
+        preference.id
+        for preference in preferences
+        if preference.active and preference.weight != 0
+    }
+    active_ids = {preference.id for preference in preferences if preference.active}
+    evaluation_map = {
+        evaluation.identity.article_id: evaluation for evaluation in evaluations
+    }
+    details: list[str] = []
+    for record in records:
+        if (
+            record.eligibility_reason
+            is not EligibilityReason.INCOMPLETE_PERSONAL_EVALUATION
+        ):
+            continue
+        evaluation = evaluation_map.get(record.article_id)
+        found_ids = (
+            {item.parameter_id for item in evaluation.relevances}
+            if evaluation is not None
+            and evaluation.status is EvaluationStatus.COMPLETE
+            and evaluation.identity.article_analysis_id == record.article_analysis_id
+            else set()
+        )
+        status = evaluation.status.value if evaluation is not None else "missing"
+        details.append(
+            f"article={record.article_id},evaluation_status={status},"
+            f"expected={len(expected_ids)},found={len(found_ids)},"
+            f"missing={len(expected_ids - found_ids)},"
+            f"unexpected={len(found_ids - active_ids)}"
+        )
+        if len(details) >= 10:
+            break
+    return tuple(details)
 
 
 def candidate_snapshot_hash(
@@ -218,6 +297,17 @@ class PersonalRankingService:
                     record.explicit_protected for record in ordered_records
                 ),
                 "eligibility_reason_counts": dict(sorted(eligibility_counts.items())),
+                "explicit_veto_details": _explicit_veto_details(
+                    ordered_records,
+                    configuration,
+                ),
+                "incomplete_personal_evaluation_details": (
+                    _incomplete_evaluation_details(
+                        ordered_records,
+                        preferences,
+                        evaluations,
+                    )
+                ),
             },
         )
         diversity = self._selector.select(

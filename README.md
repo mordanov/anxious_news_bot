@@ -186,6 +186,9 @@ The application emits structured count-only diagnostics without article text:
   `personal_news_evaluations_completed` show candidate and evaluation counts.
 - `ranking_eligibility_summary` groups exclusions by reason, including
   `explicit_veto`, missing analysis, source quality, freshness, and duplicates.
+  It also includes bounded article/parameter IDs and numeric alignment for
+  explicit vetoes, plus bounded article IDs and coverage counts for incomplete
+  personal evaluations; preference text and article text are never logged.
 - `personal_news_selection_completed` shows the final requested, ranked, and
   deliverable counts.
 

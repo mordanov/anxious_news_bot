@@ -99,7 +99,20 @@ class TuneTelegramAdapter:
         except AnswerRejected:
             await query.edit_message_text(MESSAGES[language]["stale"])
             return
-        await self._render_message(query.edit_message_text, state, language)
+        
+        # If still asking a question, edit the message
+        if state.kind is TuneStateKind.QUESTION:
+            await self._render_message(query.edit_message_text, state, language)
+        else:
+            # Delete the question and send a new message for processing/completed states
+            await query.delete_message()
+            state_messages = {
+                TuneStateKind.GENERATING: MESSAGES[language]["generating"],
+                TuneStateKind.PROCESSING: MESSAGES[language]["processing"],
+                TuneStateKind.COMPLETED: MESSAGES[language]["completed"],
+                TuneStateKind.FAILED: MESSAGES[language]["failed"],
+            }
+            await query.message.chat.send_message(state_messages[state.kind])
 
     @staticmethod
     async def _render_message(
@@ -107,30 +120,26 @@ class TuneTelegramAdapter:
         state: TuneState,
         language: SupportedLanguage = SupportedLanguage.ENGLISH,
     ) -> None:
-        messages = MESSAGES[language]
-        if state.kind is TuneStateKind.QUESTION:
-            if state.ordinal is None or state.question is None:
-                raise RuntimeError("question state is incomplete")
-            keyboard = InlineKeyboardMarkup(
-                [
-                    [
-                        InlineKeyboardButton(
-                            option.label,
-                            callback_data=f"{CALLBACK_PREFIX}{option.callback_token}",
-                        )
-                    ]
-                    for option in state.options
-                ]
-            )
-            await reply(
-                f"{messages['question']} {state.ordinal}/10\n\n{state.question}",
-                reply_markup=keyboard,
-            )
+        # This method only handles QUESTION states
+        if state.kind is not TuneStateKind.QUESTION:
+            LOGGER.warning("_render_message called with non-question state: %s", state.kind)
             return
-        state_messages = {
-            TuneStateKind.GENERATING: messages["generating"],
-            TuneStateKind.PROCESSING: messages["processing"],
-            TuneStateKind.COMPLETED: messages["completed"],
-            TuneStateKind.FAILED: messages["failed"],
-        }
-        await reply(state_messages[state.kind])
+        
+        messages = MESSAGES[language]
+        if state.ordinal is None or state.question is None:
+            raise RuntimeError("question state is incomplete")
+        keyboard = InlineKeyboardMarkup(
+            [
+                [
+                    InlineKeyboardButton(
+                        option.label,
+                        callback_data=f"{CALLBACK_PREFIX}{option.callback_token}",
+                    )
+                ]
+                for option in state.options
+            ]
+        )
+        await reply(
+            f"{messages['question']} {state.ordinal}/10\n\n{state.question}",
+            reply_markup=keyboard,
+        )

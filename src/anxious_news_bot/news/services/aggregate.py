@@ -159,27 +159,61 @@ class DefaultNewsAggregator:
                 async with semaphore:
                     return await self._process_source(cycle.id, source)
 
+            fetching_started = time.monotonic()
             outcomes = await asyncio.gather(*(limited(source) for source in sources))
+            fetching_duration_ms = round((time.monotonic() - fetching_started) * 1000)
             success_count = sum(success for success, _ in outcomes)
             failure_count = len(outcomes) - success_count
             created_ids = tuple(
                 article_id for _, article_ids in outcomes for article_id in article_ids
             )
+            pending_lookup_started = time.monotonic()
             async with self._repository.unit_of_work() as work:
                 post_processing_ids = tuple(
                     await work.pending_post_processing_article_ids()
                 )
+            pending_lookup_duration_ms = round(
+                (time.monotonic() - pending_lookup_started) * 1000
+            )
+            consolidation_duration_ms = 0
             if post_processing_ids and (
                 self._deduplicator is not None or self._event_grouper is not None
             ):
+                consolidation_started = time.monotonic()
                 await self._consolidate_articles(post_processing_ids)
+                consolidation_duration_ms = round(
+                    (time.monotonic() - consolidation_started) * 1000
+                )
+            enrichment_duration_ms = 0
             if post_processing_ids and self._enrichment_service is not None:
+                enrichment_started = time.monotonic()
                 await self._enrich_articles(post_processing_ids)
+                enrichment_duration_ms = round(
+                    (time.monotonic() - enrichment_started) * 1000
+                )
+            marking_duration_ms = 0
             if post_processing_ids:
+                marking_started = time.monotonic()
                 async with self._repository.unit_of_work() as work:
                     await work.mark_articles_post_processed(
                         post_processing_ids, self._clock.now()
                     )
+                marking_duration_ms = round((time.monotonic() - marking_started) * 1000)
+            LOGGER.info(
+                "news_cycle_stage_timings",
+                extra={
+                    "news": {
+                        "cycle_id": str(cycle.id),
+                        "due_source_count": len(sources),
+                        "post_processing_count": len(post_processing_ids),
+                        "fetching_duration_ms": fetching_duration_ms,
+                        "pending_lookup_duration_ms": pending_lookup_duration_ms,
+                        "consolidation_duration_ms": consolidation_duration_ms,
+                        "enrichment_duration_ms": enrichment_duration_ms,
+                        "marking_duration_ms": marking_duration_ms,
+                    }
+                },
+            )
             status = (
                 CycleStatus.COMPLETED_WITH_ERRORS
                 if failure_count

@@ -38,3 +38,23 @@ class TestJsonFormatterDigest:
             "status": "failed",
             "nested": {"duration_ms": 25},
         }
+
+
+def test_model_context_includes_timing_without_secrets() -> None:
+    formatter = JsonFormatter()
+    record = logging.LogRecord("test", logging.INFO, "", 0, "msg", (), None)
+    record.model = {
+        "operation": "article_preference_evaluation",
+        "status": "succeeded",
+        "duration_ms": 1250,
+        "api_key": "secret",
+    }
+
+    parsed = json.loads(formatter.format(record))
+
+    assert parsed["model"] == {
+        "operation": "article_preference_evaluation",
+        "status": "succeeded",
+        "duration_ms": 1250,
+        "api_key": "<redacted>",
+    }

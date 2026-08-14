@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import logging
+import time
 from collections.abc import Mapping
 from typing import Any
 
@@ -11,6 +13,8 @@ from tenacity import (
     stop_after_attempt,
     wait_exponential,
 )
+
+LOGGER = logging.getLogger(__name__)
 
 
 def _openai_compatible_schema(value: Any) -> Any:
@@ -69,6 +73,7 @@ class StructuredModelTransport:
             reraise=True,
         )
         async for attempt in retrying:
+            started = time.monotonic()
             with attempt:
                 response = await self._client.post(
                     f"{self._base_url}/chat/completions",
@@ -104,6 +109,20 @@ class StructuredModelTransport:
                 value = json.loads(content) if isinstance(content, str) else content
                 if not isinstance(value, dict):
                     raise ValueError("model response must be an object")
+                LOGGER.info(
+                    "structured_model_request_completed",
+                    extra={
+                        "model": {
+                            "operation": name,
+                            "status": "succeeded",
+                            "attempt": attempt.retry_state.attempt_number,
+                            "attempt_limit": self._retry_attempts,
+                            "duration_ms": round((time.monotonic() - started) * 1000),
+                            "response_bytes": len(response.content),
+                            "http_status": response.status_code,
+                        }
+                    },
+                )
                 return value
         raise RuntimeError("unreachable")
 

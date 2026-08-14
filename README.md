@@ -197,8 +197,32 @@ request ID and correlate it with the latest aggregation cycle:
 
 ```bash
 docker compose logs anxious-news-bot \
-  | grep -E 'runtime_configuration|news_(cycle|source)|personal_news|ranking_eligibility_summary|diversity_'
+  | grep -E 'runtime_configuration|news_(cycle|source)|personal_news|ranking_eligibility_summary|diversity_|structured_model_request_completed'
 ```
+
+For VPS/local performance comparisons, compare `duration_ms` fields for the same
+operation rather than total command time:
+
+- `news_cycle_stage_timings` separates source fetching, pending-row lookup,
+  duplicate/event consolidation, enrichment, and final marking.
+- `structured_model_request_completed` measures each remote model HTTP request.
+- `personal_news_evaluations_completed` reports evaluation batch wall time and
+  the slowest individual evaluation.
+- `personal_news_selection_completed` separates ranking persistence, delivery
+  loading, and total selection time.
+
+Also capture host contention while reproducing the command:
+
+```bash
+docker stats --no-stream
+docker compose exec anxious-news-bot sh -c \
+  'cat /sys/fs/cgroup/cpu.max /sys/fs/cgroup/memory.max 2>/dev/null'
+```
+
+The shared VPS stack has more persistent data and shares PostgreSQL, CPU, memory,
+and outbound networking with other applications, so matching environment values
+alone do not make it equivalent to a fresh local database and dedicated Docker
+runtime.
 
 Ranking and explicit-preference settings include:
 

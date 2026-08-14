@@ -29,6 +29,9 @@ class JsonFormatter(logging.Formatter):
         digest_context = getattr(record, "digest", None)
         if isinstance(digest_context, dict):
             payload["digest"] = sanitized_digest_fields(digest_context)
+        model_context = getattr(record, "model", None)
+        if isinstance(model_context, dict):
+            payload["model"] = DiagnosticContext.sanitized(model_context).as_dict()
         if record.exc_info:
             payload["exception"] = self.formatException(record.exc_info)
         return json.dumps(payload)

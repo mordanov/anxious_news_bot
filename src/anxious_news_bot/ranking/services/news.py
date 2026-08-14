@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from uuid import UUID
 
 from anxious_news_bot.ranking.domain import (
@@ -77,8 +78,10 @@ class PersonalNewsService:
     ) -> PersonalNewsSelection:
         configuration = self._configuration_provider.current()
         self._validate_candidate_limit(candidate_limit, count, configuration)
+        selection_started = time.monotonic()
 
         ranking_at = self._clock.now()
+        candidate_started = time.monotonic()
         candidate_ids = await self._repository.prepare_delivery_candidates(
             limit=candidate_limit,
             ranking_at=ranking_at,
@@ -96,6 +99,7 @@ class PersonalNewsService:
                     "requested_count": count,
                     "candidate_limit": candidate_limit,
                     "prepared_candidate_count": len(candidate_ids),
+                    "duration_ms": round((time.monotonic() - candidate_started) * 1000),
                     "freshness_horizon_seconds": (
                         configuration.freshness_horizon_seconds
                     ),
@@ -149,7 +153,7 @@ class PersonalNewsService:
             )
 
         has_preferences = await self._repository.has_active_nonzero_preferences(user_id)
-        evaluation_counts = (0, 0, 0)
+        evaluation_counts = (0, 0, 0, 0, 0)
         if has_preferences:
             evaluation_counts = await self._evaluate_candidates(user_id, candidate_ids)
         LOGGER.info(
@@ -166,10 +170,13 @@ class PersonalNewsService:
                     "complete_evaluation_count": evaluation_counts[0],
                     "incomplete_evaluation_count": evaluation_counts[1],
                     "failed_evaluation_count": evaluation_counts[2],
+                    "duration_ms": evaluation_counts[3],
+                    "maximum_evaluation_duration_ms": evaluation_counts[4],
                 }
             },
         )
 
+        ranking_started = time.monotonic()
         result = await self._ranker.rank(
             user_id,
             request_id,
@@ -177,7 +184,10 @@ class PersonalNewsService:
             requested_count=count,
             ranking_at=ranking_at,
         )
+        ranking_duration_ms = round((time.monotonic() - ranking_started) * 1000)
+        delivery_started = time.monotonic()
         items = await self._load_ranked_items(result)
+        delivery_duration_ms = round((time.monotonic() - delivery_started) * 1000)
         LOGGER.info(
             "personal_news_selection_completed",
             extra={
@@ -196,6 +206,11 @@ class PersonalNewsService:
                         result.selected_count - len(items)
                     ),
                     "shortage_count": max(count - len(items), 0),
+                    "ranking_duration_ms": ranking_duration_ms,
+                    "delivery_loading_duration_ms": delivery_duration_ms,
+                    "total_duration_ms": round(
+                        (time.monotonic() - selection_started) * 1000
+                    ),
                 }
             },
         )
@@ -244,24 +259,32 @@ class PersonalNewsService:
 
     async def _evaluate_candidates(
         self, user_id: UUID, candidate_ids: tuple[UUID, ...]
-    ) -> tuple[int, int, int]:
+    ) -> tuple[int, int, int, int, int]:
         semaphore = asyncio.Semaphore(self._evaluation_concurrency)
+        batch_started = time.monotonic()
 
-        async def evaluate(article_id: UUID) -> str:
+        async def evaluate(article_id: UUID) -> tuple[str, int]:
             async with semaphore:
+                started = time.monotonic()
                 try:
                     result = await self._evaluator.evaluate(user_id, article_id)
                     if result.status is not EvaluationStatus.COMPLETE:
-                        return "incomplete"
+                        status = "incomplete"
+                    else:
+                        status = "complete"
                 except EvaluationError:
-                    return "failed"
-                return "complete"
+                    status = "failed"
+            return status, round((time.monotonic() - started) * 1000)
 
         outcomes = await asyncio.gather(
             *(evaluate(article_id) for article_id in candidate_ids)
         )
+        statuses = tuple(status for status, _ in outcomes)
+        durations = tuple(duration for _, duration in outcomes)
         return (
-            outcomes.count("complete"),
-            outcomes.count("incomplete"),
-            outcomes.count("failed"),
+            statuses.count("complete"),
+            statuses.count("incomplete"),
+            statuses.count("failed"),
+            round((time.monotonic() - batch_started) * 1000),
+            max(durations, default=0),
         )

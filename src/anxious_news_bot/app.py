@@ -1,5 +1,7 @@
 import logging
+import os
 from decimal import Decimal
+from pathlib import Path
 
 import httpx
 from apscheduler.jobstores.base import JobLookupError
@@ -131,6 +133,13 @@ _BOT_COMMANDS = [
     BotCommand("count", "Set digest size (5-20)"),
     BotCommand("help", "Show available commands"),
 ]
+
+
+def _runtime_limit(path: str) -> str | None:
+    try:
+        return Path(path).read_text(encoding="utf-8").strip()[:100]
+    except OSError:
+        return None
 
 
 def _stop_scheduler(scheduler: object | None) -> None:
@@ -428,6 +437,9 @@ def build_application(settings: Settings) -> Application:
                         settings.news_command_evaluation_concurrency
                     ),
                     "event_window_hours": settings.news_event_window_hours,
+                    "logical_cpu_count": os.cpu_count(),
+                    "cgroup_cpu_limit": _runtime_limit("/sys/fs/cgroup/cpu.max"),
+                    "cgroup_memory_limit": _runtime_limit("/sys/fs/cgroup/memory.max"),
                 },
                 "ranking": {
                     "event": "runtime_configuration",

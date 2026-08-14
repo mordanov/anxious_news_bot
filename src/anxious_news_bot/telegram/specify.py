@@ -6,9 +6,9 @@ from telegram import Update
 from telegram.ext import ContextTypes
 
 from anxious_news_bot.preferences.domain import (
-    SupportedLanguage,
     SpecifyState,
     SpecifyStateKind,
+    SupportedLanguage,
 )
 from anxious_news_bot.preferences.services.language import UserLanguageService
 from anxious_news_bot.preferences.services.specify import ExplicitPreferenceService
@@ -68,10 +68,10 @@ class SpecifyTelegramAdapter:
                 extra={"update_id": getattr(update, "update_id", None)},
             )
             return
-        
+
         language = await self._language_service.get(user.id, user.language_code)
         messages = MESSAGES[language]
-        
+
         statement = self._extract_statement(message.text)
         if not statement:
             LOGGER.warning(
@@ -117,7 +117,8 @@ class SpecifyTelegramAdapter:
         messages = MESSAGES[language]
         state_messages = {
             SpecifyStateKind.PROCESSING: messages["processing"],
-            SpecifyStateKind.APPLIED: state.message or "Saved your explicit preference.",
+            SpecifyStateKind.APPLIED: state.message
+            or "Saved your explicit preference.",
             SpecifyStateKind.NO_CHANGE: state.message or messages["no_change"],
             SpecifyStateKind.INVALID: state.message or messages["invalid"],
             SpecifyStateKind.STALE_RETRY: state.message or messages["stale_retry"],

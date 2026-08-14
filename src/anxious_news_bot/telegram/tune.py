@@ -99,7 +99,7 @@ class TuneTelegramAdapter:
         except AnswerRejected:
             await query.edit_message_text(MESSAGES[language]["stale"])
             return
-        
+
         # If still asking a question, edit the message
         if state.kind is TuneStateKind.QUESTION:
             await self._render_message(query.edit_message_text, state, language)
@@ -122,9 +122,11 @@ class TuneTelegramAdapter:
     ) -> None:
         # This method only handles QUESTION states
         if state.kind is not TuneStateKind.QUESTION:
-            LOGGER.warning("_render_message called with non-question state: %s", state.kind)
+            LOGGER.warning(
+                "_render_message called with non-question state: %s", state.kind
+            )
             return
-        
+
         messages = MESSAGES[language]
         if state.ordinal is None or state.question is None:
             raise RuntimeError("question state is incomplete")

@@ -63,13 +63,13 @@ class LanguageTelegramAdapter:
             return
         await query.answer()
         data = query.data
-        
+
         # Get user's current language for error messages
         if user is not None:
             current_language = await self._service.get(user.id, user.language_code)
         else:
             current_language = SupportedLanguage.ENGLISH
-        
+
         if (
             user is None
             or not isinstance(data, str)

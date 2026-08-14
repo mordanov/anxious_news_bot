@@ -180,6 +180,25 @@ class Settings:
     ranking_detail_retention_days: int = 90
     ranking_retention_batch_size: int = 500
     ranking_retention_scan_interval_seconds: int = 86_400
+    digest_scan_interval_seconds: int = 60
+    digest_claim_batch_size: int = 100
+    digest_max_claims_per_tick: int = 1000
+    digest_claim_time_budget_seconds: int = 30
+    digest_user_concurrency: int = 5
+    digest_default_count: int = 10
+    digest_default_local_time: str = "09:00"
+    digest_default_timezone: str = "UTC"
+    digest_candidate_limit: int = 100
+    digest_max_attempts: int = 3
+    digest_retry_base_seconds: int = 60
+    digest_retry_max_seconds: int = 900
+    digest_material_update_policy_version: str = "1.0"
+    digest_material_update_novelty_threshold: Decimal = Decimal("0.7000")
+    digest_material_update_max_content_similarity: Decimal = Decimal("0.60000")
+    digest_material_update_min_text_chars: int = 200
+    digest_history_retention_days: int = 30
+    digest_content_max_input_chars: int = 2000
+    digest_renderer_version: str = "1.0"
 
     @classmethod
     def from_env(cls) -> Settings:
@@ -420,6 +439,71 @@ class Settings:
                 86_400,
                 minimum=1,
             ),
+            digest_scan_interval_seconds=_integer(
+                "DIGEST_SCAN_INTERVAL_SECONDS", 60, maximum=86_400
+            ),
+            digest_claim_batch_size=_integer(
+                "DIGEST_CLAIM_BATCH_SIZE", 100, minimum=1, maximum=1_000
+            ),
+            digest_max_claims_per_tick=_integer(
+                "DIGEST_MAX_CLAIMS_PER_TICK", 1000, minimum=1, maximum=10_000
+            ),
+            digest_claim_time_budget_seconds=_integer(
+                "DIGEST_CLAIM_TIME_BUDGET_SECONDS", 30, minimum=1, maximum=300
+            ),
+            digest_user_concurrency=_integer(
+                "DIGEST_USER_CONCURRENCY", 5, minimum=1, maximum=50
+            ),
+            digest_default_count=_integer(
+                "DIGEST_DEFAULT_COUNT", 10, minimum=5, maximum=20
+            ),
+            digest_default_local_time=_text("DIGEST_DEFAULT_LOCAL_TIME", "09:00"),
+            digest_default_timezone=_text("DIGEST_DEFAULT_TIMEZONE", "UTC"),
+            digest_candidate_limit=_integer(
+                "DIGEST_CANDIDATE_LIMIT", 100, minimum=20, maximum=500
+            ),
+            digest_max_attempts=_integer(
+                "DIGEST_MAX_ATTEMPTS", 3, minimum=1, maximum=10
+            ),
+            digest_retry_base_seconds=_integer(
+                "DIGEST_RETRY_BASE_SECONDS", 60, minimum=1, maximum=86_400
+            ),
+            digest_retry_max_seconds=_integer(
+                "DIGEST_RETRY_MAX_SECONDS", 900, minimum=1, maximum=86_400
+            ),
+            digest_material_update_policy_version=_text(
+                "DIGEST_MATERIAL_UPDATE_POLICY_VERSION", "1.0"
+            ),
+            digest_material_update_novelty_threshold=_decimal(
+                "DIGEST_MATERIAL_UPDATE_NOVELTY_THRESHOLD",
+                "0.7000",
+                minimum="0.0000",
+                maximum="1.0000",
+                places=4,
+            ),
+            digest_material_update_max_content_similarity=_decimal(
+                "DIGEST_MATERIAL_UPDATE_MAX_CONTENT_SIMILARITY",
+                "0.60000",
+                minimum="0.00000",
+                maximum="1.00000",
+                places=5,
+            ),
+            digest_material_update_min_text_chars=_integer(
+                "DIGEST_MATERIAL_UPDATE_MIN_TEXT_CHARS",
+                200,
+                minimum=1,
+                maximum=100_000,
+            ),
+            digest_history_retention_days=_integer(
+                "DIGEST_HISTORY_RETENTION_DAYS", 30, minimum=1, maximum=3_650
+            ),
+            digest_content_max_input_chars=_integer(
+                "DIGEST_CONTENT_MAX_INPUT_CHARS",
+                2000,
+                minimum=100,
+                maximum=10_000,
+            ),
+            digest_renderer_version=_text("DIGEST_RENDERER_VERSION", "1.0"),
         )
         settings._validate()
         return settings
@@ -501,3 +585,40 @@ class Settings:
             )
         if self.ranking_personal_coefficient < Decimal("0.40000"):
             raise RuntimeError("RANKING_PERSONAL_COEFFICIENT must be at least 0.40000")
+        if self.digest_retry_max_seconds < self.digest_retry_base_seconds:
+            raise RuntimeError(
+                "DIGEST_RETRY_MAX_SECONDS must not be below DIGEST_RETRY_BASE_SECONDS"
+            )
+        if self.digest_max_claims_per_tick < self.digest_claim_batch_size:
+            raise RuntimeError(
+                "DIGEST_MAX_CLAIMS_PER_TICK must not be below DIGEST_CLAIM_BATCH_SIZE"
+            )
+        if not self.digest_material_update_policy_version:
+            raise RuntimeError(
+                "DIGEST_MATERIAL_UPDATE_POLICY_VERSION must not be empty"
+            )
+        if not self.digest_default_timezone:
+            raise RuntimeError("DIGEST_DEFAULT_TIMEZONE must not be empty")
+        from anxious_news_bot.digest.domain import validate_iana_timezone
+
+        try:
+            validate_iana_timezone(self.digest_default_timezone)
+        except ValueError as exc:
+            raise RuntimeError(f"DIGEST_DEFAULT_TIMEZONE is invalid: {exc}") from exc
+        from anxious_news_bot.digest.domain import validate_local_time
+
+        try:
+            validate_local_time(self.digest_default_local_time)
+        except ValueError as exc:
+            raise RuntimeError(f"DIGEST_DEFAULT_LOCAL_TIME is invalid: {exc}") from exc
+        if not self.digest_renderer_version:
+            raise RuntimeError("DIGEST_RENDERER_VERSION must not be empty")
+        if self.digest_candidate_limit > self.ranking_maximum_candidates:
+            raise RuntimeError(
+                "DIGEST_CANDIDATE_LIMIT must not exceed RANKING_MAXIMUM_CANDIDATES"
+            )
+        freshness_days = math.ceil(self.ranking_freshness_horizon_seconds / 86_400)
+        if self.digest_history_retention_days < freshness_days:
+            raise RuntimeError(
+                "DIGEST_HISTORY_RETENTION_DAYS must cover the ranking freshness horizon"
+            )

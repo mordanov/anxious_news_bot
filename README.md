@@ -3,14 +3,23 @@
 Telegram application with a scheduled, PostgreSQL-backed RSS/Atom aggregation
 pipeline plus explicit preference capture and deterministic personalized ranking.
 It normalizes articles, consolidates duplicates, groups related events, accepts
-validated `/tune` and `/specify` preference updates, and persists explainable
-ranking evidence with bounded retention.
+validated `/tune`, `/specify`, and `/count` updates, delivers timezone-aware
+personalized digests, and persists explainable ranking and at-most-once delivery
+evidence with bounded retention.
 
 ## Requirements
 
 - Python 3.11+
 - PostgreSQL 16+ with permission to enable `pg_trgm`
 - A Telegram bot token from [BotFather](https://t.me/BotFather)
+
+## Documentation
+
+- [Architecture and lifecycle](docs/architecture.md)
+- [Local and production setup](docs/setup.md)
+- [User workflows](docs/user-guide.md)
+- [Contributor development guide](docs/development.md)
+- [Specification 004 implementation summary](docs/summary_spec_4.md)
 
 ## Install and configure
 
@@ -64,6 +73,20 @@ quality eligibility, and diversity selection. Articles without generic analysis
 receive a conservative deterministic baseline before personal evaluation. The
 selected headlines are translated in one structured LLM request into the language
 chosen with `/language`; article URLs and source metadata remain unchanged.
+
+Send `/count <value>` to set the maximum scheduled digest size. Values `5`
+through `20` are accepted; missing, extra, non-decimal, or out-of-range arguments
+leave the stored value unchanged and return localized guidance. New users always
+receive a disabled-safe digest configuration. Schedule enablement, local time,
+and timezone are intentionally operational settings in this release and are not
+changed by `/count`.
+
+The digest scanner claims due local occurrences in bounded PostgreSQL batches,
+reuses the existing personal ranking/diversity pipeline, filters confirmed or
+uncertain delivery history before evaluation, and sends immutable structured
+items through Telegram. Retries keep the same execution and ranking request IDs.
+Acknowledged message parts are skipped; an ambiguous provider outcome becomes
+terminal `delivery_unknown` evidence and is never resent automatically.
 
 Send `/language` to choose `Русский`, `English`, or `Español` for the current
 user. The selection persists across restarts. Changing it closes any unfinished
@@ -170,6 +193,30 @@ Ranking and explicit-preference settings include:
 | `RANKING_RETENTION_BATCH_SIZE` | `500` | Rows or detail groups processed per cleanup run |
 | `RANKING_RETENTION_SCAN_INTERVAL_SECONDS` | `86400` | Personalized-ranking cleanup cadence |
 
+Scheduled digest settings include:
+
+| Variable | Default | Purpose |
+|---|---:|---|
+| `DIGEST_SCAN_INTERVAL_SECONDS` | `60` | Due/retry scan cadence |
+| `DIGEST_CLAIM_BATCH_SIZE` | `100` | Configurations claimed per indexed query |
+| `DIGEST_MAX_CLAIMS_PER_TICK` | `1000` | Durable occurrence claims per scan |
+| `DIGEST_CLAIM_TIME_BUDGET_SECONDS` | `30` | Claim-work budget per scan |
+| `DIGEST_USER_CONCURRENCY` | `5` | Concurrent isolated user executions |
+| `DIGEST_DEFAULT_COUNT` | `10` | Disabled-safe initial item limit |
+| `DIGEST_DEFAULT_LOCAL_TIME` | `09:00` | Disabled-safe local wall-clock time |
+| `DIGEST_DEFAULT_TIMEZONE` | `UTC` | Disabled-safe IANA timezone |
+| `DIGEST_CANDIDATE_LIMIT` | `100` | Bounded pre-history candidate pool |
+| `DIGEST_MAX_ATTEMPTS` | `3` | Total attempts for one occurrence |
+| `DIGEST_RETRY_BASE_SECONDS` | `60` | Initial exponential retry delay |
+| `DIGEST_RETRY_MAX_SECONDS` | `900` | Retry delay ceiling |
+| `DIGEST_MATERIAL_UPDATE_POLICY_VERSION` | `1.0` | Immutable evidence policy key |
+| `DIGEST_MATERIAL_UPDATE_NOVELTY_THRESHOLD` | `0.7000` | Accepted novelty threshold |
+| `DIGEST_MATERIAL_UPDATE_MAX_CONTENT_SIMILARITY` | `0.60000` | Content-delta ceiling |
+| `DIGEST_MATERIAL_UPDATE_MIN_TEXT_CHARS` | `200` | Minimum comparison text |
+| `DIGEST_HISTORY_RETENTION_DAYS` | `30` | Confirmed delivery-history horizon |
+| `DIGEST_CONTENT_MAX_INPUT_CHARS` | `2000` | Per-item composition grounding cap |
+| `DIGEST_RENDERER_VERSION` | `1.0` | Deterministic rendering policy version |
+
 ## Database setup and migrations
 
 Create the database, grant the application role permission to create extensions,
@@ -181,10 +228,12 @@ alembic upgrade head
 alembic current
 ```
 
-The initial migration enables `pg_trgm` and creates the source, cycle, article,
-provenance, duplicate-decision, event-group, and analysis tables. Apply migrations
-before starting the bot and use `alembic downgrade -1` only with a reviewed backup
-and rollback plan.
+The initial migration enables `pg_trgm`. Revision `005_scheduler_digest` creates
+configuration, execution, attempt, item, delivery-part, history, and immutable
+material-update evidence tables. It backfills every existing user with disabled
+delivery, count `10`, local time `09:00`, timezone `UTC`, and no next-due instant.
+Apply migrations before starting the bot and use `alembic downgrade -1` only with
+a reviewed backup and rollback plan.
 
 ## Source configuration
 
@@ -214,6 +263,13 @@ uses bounded concurrency, and acquires a PostgreSQL advisory lock so overlapping
 cycles return `already_running`. One source failure is recorded without cancelling
 sibling sources. Repeated canonical input is idempotent, and a cycle exposes only
 articles newly created during that cycle.
+
+The same application process registers one digest timing adapter and one bounded
+retention job. It does not create one in-memory job per user. To enable an
+acceptance user until schedule-management commands exist, follow
+`specs/004-scheduler-digest/quickstart.md`; do not expose direct SQL as an end-user
+interface. Treat `delivery_unknown` as reconciliation-required and never reset an
+unknown part to pending without verified provider evidence.
 
 Structured news diagnostics contain cycle/source/article identifiers, stage,
 status, bounded counts, and sanitized error context. Credentials, secret URL
@@ -301,7 +357,12 @@ Use the project virtual environment:
 .venv/bin/python -m compileall -q src tests
 .venv/bin/python -m pytest tests/unit/news
 .venv/bin/python -m pytest tests/integration/news
+.venv/bin/python -m pytest tests/unit/digest tests/integration/digest
 .venv/bin/python -m pytest
+.venv/bin/python -m ruff check .
+.venv/bin/python -m ruff format --check .
+.venv/bin/alembic upgrade head
+.venv/bin/alembic current
 ```
 
 Integration tests create a temporary PostgreSQL database through

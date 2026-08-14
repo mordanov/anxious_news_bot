@@ -1,10 +1,18 @@
 from __future__ import annotations
 
 import asyncio
+from uuid import UUID
 
-from anxious_news_bot.ranking.domain import EvaluationStatus, RankedNewsItem
+from anxious_news_bot.ranking.domain import (
+    EvaluationStatus,
+    PersonalNewsSelection,
+    RankedNewsItem,
+    RankingConfiguration,
+    RankingResult,
+)
 from anxious_news_bot.ranking.errors import EvaluationError, RankingRunError
 from anxious_news_bot.ranking.ports import (
+    CandidateFilter,
     Clock,
     RankingConfigurationProvider,
     RankingRepository,
@@ -48,15 +56,44 @@ class PersonalNewsService:
         if user_id is None:
             raise RankingRunError("user profile is missing", code="missing_user")
 
-        ranking_at = self._clock.now()
+        selection = await self.select_for_user(
+            user_id,
+            request_id,
+            count,
+            self._candidate_limit,
+        )
+        return selection.items
+
+    async def select_for_user(
+        self,
+        user_id: UUID,
+        request_id: str,
+        count: int,
+        candidate_limit: int,
+        candidate_filter: CandidateFilter | None = None,
+    ) -> PersonalNewsSelection:
         configuration = self._configuration_provider.current()
+        self._validate_candidate_limit(candidate_limit, count, configuration)
+
+        ranking_at = self._clock.now()
         candidate_ids = await self._repository.prepare_delivery_candidates(
-            limit=self._candidate_limit,
+            limit=candidate_limit,
             ranking_at=ranking_at,
             freshness_horizon_seconds=configuration.freshness_horizon_seconds,
         )
+
+        if candidate_filter is not None:
+            filtered = await candidate_filter.filter(user_id, candidate_ids, ranking_at)
+            candidate_ids = tuple(filtered.eligible_article_ids)
+
         if not candidate_ids:
-            return ()
+            profile_revision = await self._repository.resolve_profile_revision(user_id)
+            return PersonalNewsSelection(
+                ranking_run_id=None,
+                profile_revision=profile_revision,
+                ranking_at=ranking_at,
+                items=(),
+            )
 
         if await self._repository.has_active_nonzero_preferences(user_id):
             await self._evaluate_candidates(user_id, candidate_ids)
@@ -68,6 +105,30 @@ class PersonalNewsService:
             requested_count=count,
             ranking_at=ranking_at,
         )
+        items = await self._load_ranked_items(result)
+        return PersonalNewsSelection(
+            ranking_run_id=result.ranking_run_id,
+            profile_revision=result.identity.profile_revision,
+            ranking_at=ranking_at,
+            items=items,
+        )
+
+    @staticmethod
+    def _validate_candidate_limit(
+        candidate_limit: int,
+        count: int,
+        configuration: RankingConfiguration,
+    ) -> None:
+        if candidate_limit <= 0:
+            raise ValueError("candidate_limit must be positive")
+        if candidate_limit < count:
+            raise ValueError("candidate_limit must be at least count")
+        if candidate_limit > configuration.maximum_candidate_count:
+            raise ValueError("candidate_limit must not exceed the ranking maximum")
+
+    async def _load_ranked_items(
+        self, result: RankingResult
+    ) -> tuple[RankedNewsItem, ...]:
         selected = tuple(
             sorted(
                 (record for record in result.records if record.selection.selected),

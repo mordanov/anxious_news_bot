@@ -1,6 +1,7 @@
 import json
 import logging
 
+from anxious_news_bot.digest.observability import _sanitize as sanitized_digest_fields
 from anxious_news_bot.news.errors import DiagnosticContext
 from anxious_news_bot.ranking.observability import (
     sanitized_fields as sanitized_ranking_fields,
@@ -25,6 +26,9 @@ class JsonFormatter(logging.Formatter):
             payload["preference"] = DiagnosticContext.sanitized(
                 preference_context
             ).as_dict()
+        digest_context = getattr(record, "digest", None)
+        if isinstance(digest_context, dict):
+            payload["digest"] = sanitized_digest_fields(digest_context)
         if record.exc_info:
             payload["exception"] = self.formatException(record.exc_info)
         return json.dumps(payload)

@@ -117,7 +117,7 @@ from anxious_news_bot.telegram.specify import SpecifyTelegramAdapter
 from anxious_news_bot.telegram.tune import CALLBACK_PREFIX, TuneTelegramAdapter
 
 LOGGER = logging.getLogger(__name__)
-START_MESSAGE = "The bot is running. News features will be added soon."
+START_MESSAGE = "The bot is running. Tune your preferences with /tune command, set language with /language command."
 
 _BOT_COMMANDS = [
     BotCommand("start", "Get started with the bot"),

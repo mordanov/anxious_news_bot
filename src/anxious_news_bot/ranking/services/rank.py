@@ -86,8 +86,7 @@ def _explicit_veto_details(
         for contribution in record.contributions:
             if (
                 contribution.effective_authority is not PreferenceOrigin.EXPLICIT
-                or abs(contribution.weight)
-                < configuration.explicit_weight_threshold
+                or abs(contribution.weight) < configuration.explicit_weight_threshold
             ):
                 continue
             alignment = (

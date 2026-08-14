@@ -184,9 +184,7 @@ class PersonalNewsService:
                 "ranking": {
                     "event": "personal_news_selection_completed",
                     "stage": "delivery_loading",
-                    "status": (
-                        "shortage" if len(items) < count else "complete"
-                    ),
+                    "status": ("shortage" if len(items) < count else "complete"),
                     "user_id": str(user_id),
                     "request_id": request_id,
                     "ranking_run_id": str(result.ranking_run_id),

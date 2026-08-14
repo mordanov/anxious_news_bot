@@ -205,9 +205,7 @@ class DefaultNewsAggregator:
                         "source_failure_count": failure_count,
                         "new_article_count": len(created_ids),
                         "post_processing_count": len(post_processing_ids),
-                        "duration_ms": round(
-                            (time.monotonic() - cycle_started) * 1000
-                        ),
+                        "duration_ms": round((time.monotonic() - cycle_started) * 1000),
                     }
                 },
             )
@@ -228,9 +226,7 @@ class DefaultNewsAggregator:
                 extra={
                     "news": {
                         "cycle_id": str(cycle_id) if cycle_id is not None else None,
-                        "duration_ms": round(
-                            (time.monotonic() - cycle_started) * 1000
-                        ),
+                        "duration_ms": round((time.monotonic() - cycle_started) * 1000),
                     }
                 },
             )

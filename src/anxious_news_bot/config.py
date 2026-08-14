@@ -235,19 +235,27 @@ class Settings:
         settings = cls(
             telegram_bot_token=_text("TELEGRAM_BOT_TOKEN", required=True),
             telegram_connect_timeout_seconds=_number(
-                "TELEGRAM_CONNECT_TIMEOUT_SECONDS", 30.0, minimum=0.0,
+                "TELEGRAM_CONNECT_TIMEOUT_SECONDS",
+                30.0,
+                minimum=0.0,
                 inclusive_minimum=False,
             ),
             telegram_read_timeout_seconds=_number(
-                "TELEGRAM_READ_TIMEOUT_SECONDS", 30.0, minimum=0.0,
+                "TELEGRAM_READ_TIMEOUT_SECONDS",
+                30.0,
+                minimum=0.0,
                 inclusive_minimum=False,
             ),
             telegram_write_timeout_seconds=_number(
-                "TELEGRAM_WRITE_TIMEOUT_SECONDS", 30.0, minimum=0.0,
+                "TELEGRAM_WRITE_TIMEOUT_SECONDS",
+                30.0,
+                minimum=0.0,
                 inclusive_minimum=False,
             ),
             telegram_pool_timeout_seconds=_number(
-                "TELEGRAM_POOL_TIMEOUT_SECONDS", 10.0, minimum=0.0,
+                "TELEGRAM_POOL_TIMEOUT_SECONDS",
+                10.0,
+                minimum=0.0,
                 inclusive_minimum=False,
             ),
             database_url=_database_url(),

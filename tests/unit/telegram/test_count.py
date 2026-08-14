@@ -14,6 +14,7 @@ from anxious_news_bot.telegram.count import (
 @pytest.fixture
 def adapter():
     config_service = AsyncMock()
+    config_service.get_current = AsyncMock(return_value=None)
     language_service = AsyncMock()
     language_service.get = AsyncMock(return_value=SupportedLanguage.ENGLISH)
     return CountTelegramAdapter(config_service, language_service)
@@ -69,7 +70,10 @@ class TestCountCommand:
     @pytest.mark.asyncio
     async def test_missing_argument(self, adapter, update):
         update.message.text = "/count"
+        # Mock get_current to return None (no count set)
+        adapter._service.get_current = AsyncMock(return_value=None)
         await adapter.command(update, MagicMock())
+        # When no count is set, should show just guidance
         update.message.reply_text.assert_awaited_once_with(
             GUIDANCE_MESSAGES[SupportedLanguage.ENGLISH]
         )
@@ -109,7 +113,8 @@ class TestCountCommand:
         self, adapter, update, text
     ):
         update.message.text = text
-
+        # Mock get_current to return None (no count set)
+        adapter._service.get_current = AsyncMock(return_value=None)
         await adapter.command(update, MagicMock())
 
         adapter._service.set_count.assert_not_awaited()

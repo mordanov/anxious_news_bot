@@ -6,7 +6,11 @@ from uuid import uuid4
 
 import pytest
 
-from anxious_news_bot.preferences.domain import SpecifyState, SpecifyStateKind
+from anxious_news_bot.preferences.domain import (
+    SupportedLanguage,
+    SpecifyState,
+    SpecifyStateKind,
+)
 from anxious_news_bot.telegram.specify import SpecifyTelegramAdapter
 
 
@@ -21,7 +25,9 @@ async def test_extracts_text_update_identity_and_language_before_calling_service
             message="Saved your explicit preference for Kirov city news.",
         )
     )
-    adapter = SpecifyTelegramAdapter(service, max_text_length=1000)
+    language_service = AsyncMock()
+    language_service.get = AsyncMock(return_value=SupportedLanguage.RUSSIAN)
+    adapter = SpecifyTelegramAdapter(service, language_service, max_text_length=1000)
     message = Mock(text="/specify   More Kirov city news   ")
     message.reply_text = AsyncMock()
     update = Mock(
@@ -34,7 +40,7 @@ async def test_extracts_text_update_identity_and_language_before_calling_service
 
     service.specify.assert_awaited_once_with(123, 77, "More Kirov city news", "ru")
     assert message.reply_text.await_args_list[0].args == (
-        "Interpreting your explicit preference...",
+        "Обрабатываю ваше предпочтение...",
     )
     assert message.reply_text.await_args_list[-1].args == (
         "Saved your explicit preference for Kirov city news.",
@@ -92,14 +98,18 @@ async def test_extracts_text_update_identity_and_language_before_calling_service
 )
 async def test_renders_all_specify_states(state: SpecifyState, expected: str) -> None:
     reply = AsyncMock()
-    await SpecifyTelegramAdapter._render_message(reply, state)
+    await SpecifyTelegramAdapter._render_message(
+        reply, state, SupportedLanguage.ENGLISH
+    )
     reply.assert_awaited_once_with(expected)
 
 
 async def test_missing_user_or_message_is_ignored() -> None:
     service = Mock()
     service.specify = AsyncMock()
-    await SpecifyTelegramAdapter(service).command(
+    language_service = AsyncMock()
+    language_service.get = AsyncMock(return_value=SupportedLanguage.ENGLISH)
+    await SpecifyTelegramAdapter(service, language_service).command(
         Mock(update_id=77, effective_user=None, message=None),
         Mock(),
     )
@@ -109,7 +119,11 @@ async def test_missing_user_or_message_is_ignored() -> None:
 async def test_blank_and_over_limit_text_return_controlled_messages() -> None:
     service = Mock()
     service.specify = AsyncMock()
-    adapter = SpecifyTelegramAdapter(service, max_text_length=10)
+    language_service = AsyncMock()
+    language_service.get = AsyncMock(return_value=SupportedLanguage.ENGLISH)
+    adapter = SpecifyTelegramAdapter(
+        service, language_service, max_text_length=10
+    )
 
     blank_message = Mock(text="/specify    ")
     blank_message.reply_text = AsyncMock()
@@ -148,7 +162,11 @@ async def test_logs_exclude_raw_statement_text(caplog) -> None:
 
     service = Mock()
     service.specify = AsyncMock()
-    adapter = SpecifyTelegramAdapter(service, max_text_length=10)
+    language_service = AsyncMock()
+    language_service.get = AsyncMock(return_value=SupportedLanguage.ENGLISH)
+    adapter = SpecifyTelegramAdapter(
+        service, language_service, max_text_length=10
+    )
     raw_text = "/specify Very sensitive Kirov statement"
     message = Mock(text=raw_text)
     message.reply_text = AsyncMock()

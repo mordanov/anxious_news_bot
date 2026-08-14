@@ -31,11 +31,12 @@ async def test_language_command_lists_supported_languages() -> None:
 
 async def test_language_callback_persists_selection() -> None:
     service = Mock()
+    service.get = AsyncMock(return_value=SupportedLanguage.ENGLISH)
     service.set = AsyncMock(return_value=SupportedLanguage.RUSSIAN)
     query = Mock(data=f"{CALLBACK_PREFIX}ru")
     query.answer = AsyncMock()
     query.edit_message_text = AsyncMock()
-    update = Mock(callback_query=query, effective_user=Mock(id=123))
+    update = Mock(callback_query=query, effective_user=Mock(id=123, language_code="en"))
 
     await LanguageTelegramAdapter(service).callback(update, Mock())
 

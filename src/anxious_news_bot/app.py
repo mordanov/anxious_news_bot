@@ -3,7 +3,7 @@ from decimal import Decimal
 
 import httpx
 from apscheduler.jobstores.base import JobLookupError
-from telegram import Update
+from telegram import BotCommand, Update
 from telegram.ext import (
     Application,
     CallbackQueryHandler,
@@ -118,6 +118,15 @@ from anxious_news_bot.telegram.tune import CALLBACK_PREFIX, TuneTelegramAdapter
 
 LOGGER = logging.getLogger(__name__)
 START_MESSAGE = "The bot is running. News features will be added soon."
+
+_BOT_COMMANDS = [
+    BotCommand("start", "Get started with the bot"),
+    BotCommand("language", "Set your language"),
+    BotCommand("news", "Get personalized news"),
+    BotCommand("tune", "Customize your preferences"),
+    BotCommand("specify", "Add an explicit preference"),
+    BotCommand("count", "Set digest size (5-20)"),
+]
 
 
 def _stop_scheduler(scheduler: object | None) -> None:
@@ -397,6 +406,8 @@ def build_application(settings: Settings) -> Application:
     )
 
     async def post_init(application: Application) -> None:
+        await application.bot.set_my_commands(_BOT_COMMANDS)
+        LOGGER.info("Bot commands registered (%d)", len(_BOT_COMMANDS))
         if application.job_queue is None:
             raise RuntimeError("Telegram JobQueue is required")
         scheduler = AggregationScheduler(

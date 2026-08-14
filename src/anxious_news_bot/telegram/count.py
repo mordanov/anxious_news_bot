@@ -30,6 +30,12 @@ GUIDANCE_MESSAGES = {
     SupportedLanguage.SPANISH: "Usa /count con un numero del 5 al 20.",
 }
 
+CURRENT_COUNT_MESSAGES = {
+    SupportedLanguage.RUSSIAN: "Текущий размер дайджеста: {count}.\n{guidance}",
+    SupportedLanguage.ENGLISH: "Current digest size: {count}.\n{guidance}",
+    SupportedLanguage.SPANISH: "Tamaño actual del resumen: {count}.\n{guidance}",
+}
+
 _DECIMAL_INTEGER = re.compile(r"^[0-9]+$")
 
 
@@ -65,7 +71,21 @@ class CountTelegramAdapter:
         parts = text.split()
         # parts[0] is /count or /count@BotName
         if len(parts) != 2:
-            await message.reply_text(GUIDANCE_MESSAGES[language])
+            # No argument provided, show current count
+            try:
+                current_config = await self._service.get_current(user.id)
+                current_count = current_config.digest_count if current_config else None
+                if current_count is None:
+                    await message.reply_text(GUIDANCE_MESSAGES[language])
+                else:
+                    help_text = CURRENT_COUNT_MESSAGES[language].format(
+                        count=current_count,
+                        guidance=GUIDANCE_MESSAGES[language],
+                    )
+                    await message.reply_text(help_text)
+            except Exception:
+                LOGGER.error("count_command_get_current_failed")
+                await message.reply_text(GUIDANCE_MESSAGES[language])
             return
 
         if _DECIMAL_INTEGER.fullmatch(parts[1]) is None:

@@ -298,12 +298,25 @@ class DefaultNewsAggregator:
             await asyncio.shield(self._finalize_cancelled_source(source_run.id))
             raise
         except NewsError as exc:
+            LOGGER.warning(
+                "news_source_failed",
+                extra={
+                    "source_id": str(source.id),
+                    "source_name": source.name,
+                    "error_code": exc.code,
+                    "error_context": exc.context.as_dict(),
+                },
+            )
             async with self._repository.unit_of_work() as work:
                 await self._record_source_failure(
                     work, source, source_run.id, observed_at, exc.code, exc.context
                 )
             return False, ()
         except Exception:
+            LOGGER.exception(
+                "news_source_failed_unexpected",
+                extra={"source_id": str(source.id), "source_name": source.name},
+            )
             async with self._repository.unit_of_work() as work:
                 await self._record_source_failure(
                     work,

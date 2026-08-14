@@ -19,6 +19,7 @@ from anxious_news_bot.news.domain import (
 from anxious_news_bot.news.errors import SourceRejected, SourceUnavailable
 
 _TRANSIENT_STATUSES = {408, 425, 429, 500, 502, 503, 504}
+_USER_AGENT = "anxious-news-bot/1.0 (+https://github.com/mordanov/anxious_news_bot)"
 
 
 def _published(entry: Any) -> datetime | None:
@@ -66,7 +67,8 @@ class FeedFetcher:
         conditional_headers: ConditionalHeaders,
     ) -> FetchResult:
         headers = {
-            "Accept": "application/atom+xml, application/rss+xml, application/xml"
+            "Accept": "application/atom+xml, application/rss+xml, application/xml",
+            "User-Agent": _USER_AGENT,
         }
         if conditional_headers.etag:
             headers["If-None-Match"] = conditional_headers.etag

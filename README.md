@@ -146,7 +146,11 @@ Operational settings include:
 
 | Variable | Default | Purpose |
 |---|---:|---|
-| `NEWS_SCHEDULER_INTERVAL_SECONDS` | `60` | Scheduler scan cadence |
+| `NEWS_SCHEDULER_INTERVAL_SECONDS` | `300` | Scheduler scan cadence |
+| `TELEGRAM_CONNECT_TIMEOUT_SECONDS` | `30` | Telegram API connection timeout |
+| `TELEGRAM_READ_TIMEOUT_SECONDS` | `30` | Telegram API response timeout |
+| `TELEGRAM_WRITE_TIMEOUT_SECONDS` | `30` | Telegram API request timeout |
+| `TELEGRAM_POOL_TIMEOUT_SECONDS` | `10` | Telegram HTTP connection-pool timeout |
 | `NEWS_FETCH_TIMEOUT_SECONDS` | `20` | Per-request timeout |
 | `NEWS_FETCH_RETRY_ATTEMPTS` | `3` | Bounded fetch attempts |
 | `NEWS_MAX_CONCURRENCY` | `5` | Maximum simultaneous source fetches |

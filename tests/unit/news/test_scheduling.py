@@ -17,9 +17,14 @@ async def test_scheduler_registers_recurring_tick_and_calls_only_aggregator() ->
     scheduler.start()
     callback = job_queue.run_repeating.call_args.args[0]
     await callback(Mock())
+    await scheduler._cycle_task
     scheduler.stop()
 
     job_queue.run_repeating.assert_called_once()
+    assert job_queue.run_repeating.call_args.kwargs["job_kwargs"] == {
+        "coalesce": True,
+        "misfire_grace_time": 60,
+    }
     aggregator.run_cycle.assert_awaited_once_with()
     job.schedule_removal.assert_called_once_with()
 
@@ -36,6 +41,7 @@ async def test_scheduler_treats_already_running_as_normal_tick_result() -> None:
 
     callback = job_queue.run_repeating.call_args.args[0]
     await callback(Mock())
+    await scheduler._cycle_task
 
     aggregator.run_cycle.assert_awaited_once_with()
 

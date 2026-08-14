@@ -25,6 +25,10 @@ def test_digest_scheduler_start_stop_are_idempotent():
     adapter.stop()
 
     queue.run_repeating.assert_called_once()
+    assert queue.run_repeating.call_args.kwargs["job_kwargs"] == {
+        "coalesce": True,
+        "misfire_grace_time": 60,
+    }
     job.schedule_removal.assert_called_once()
 
 
@@ -40,6 +44,7 @@ async def test_digest_tick_invokes_only_due_and_retry_cycles():
     adapter = DigestSchedulingAdapter(queue, service, FixedClock())
 
     await adapter.tick(object())
+    await adapter._cycle_task
 
     service.run_due_cycle.assert_awaited_once()
     service.retry_due.assert_awaited_once()

@@ -102,8 +102,12 @@ def _database_url() -> str:
 @dataclass(frozen=True, slots=True)
 class Settings:
     telegram_bot_token: str
+    telegram_connect_timeout_seconds: float = 30.0
+    telegram_read_timeout_seconds: float = 30.0
+    telegram_write_timeout_seconds: float = 30.0
+    telegram_pool_timeout_seconds: float = 10.0
     database_url: str = "postgresql+psycopg://localhost/anxious_news"
-    news_scheduler_interval_seconds: int = 60
+    news_scheduler_interval_seconds: int = 300
     news_fetch_timeout_seconds: float = 20.0
     news_fetch_retry_attempts: int = 3
     news_max_concurrency: int = 5
@@ -230,9 +234,25 @@ class Settings:
 
         settings = cls(
             telegram_bot_token=_text("TELEGRAM_BOT_TOKEN", required=True),
+            telegram_connect_timeout_seconds=_number(
+                "TELEGRAM_CONNECT_TIMEOUT_SECONDS", 30.0, minimum=0.0,
+                inclusive_minimum=False,
+            ),
+            telegram_read_timeout_seconds=_number(
+                "TELEGRAM_READ_TIMEOUT_SECONDS", 30.0, minimum=0.0,
+                inclusive_minimum=False,
+            ),
+            telegram_write_timeout_seconds=_number(
+                "TELEGRAM_WRITE_TIMEOUT_SECONDS", 30.0, minimum=0.0,
+                inclusive_minimum=False,
+            ),
+            telegram_pool_timeout_seconds=_number(
+                "TELEGRAM_POOL_TIMEOUT_SECONDS", 10.0, minimum=0.0,
+                inclusive_minimum=False,
+            ),
             database_url=_database_url(),
             news_scheduler_interval_seconds=_integer(
-                "NEWS_SCHEDULER_INTERVAL_SECONDS", 60
+                "NEWS_SCHEDULER_INTERVAL_SECONDS", 300
             ),
             news_fetch_timeout_seconds=_number(
                 "NEWS_FETCH_TIMEOUT_SECONDS",

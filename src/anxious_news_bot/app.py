@@ -11,6 +11,7 @@ from telegram.ext import (
     CommandHandler,
     ContextTypes,
 )
+from telegram.request import HTTPXRequest
 
 from anxious_news_bot.config import Settings
 from anxious_news_bot.digest.domain import RetrySchedule, validate_local_time
@@ -483,6 +484,24 @@ def build_application(settings: Settings) -> Application:
     application = (
         Application.builder()
         .token(settings.telegram_bot_token)
+        .request(
+            HTTPXRequest(
+                connection_pool_size=8,
+                connect_timeout=settings.telegram_connect_timeout_seconds,
+                read_timeout=settings.telegram_read_timeout_seconds,
+                write_timeout=settings.telegram_write_timeout_seconds,
+                pool_timeout=settings.telegram_pool_timeout_seconds,
+            )
+        )
+        .get_updates_request(
+            HTTPXRequest(
+                connection_pool_size=2,
+                connect_timeout=settings.telegram_connect_timeout_seconds,
+                read_timeout=settings.telegram_read_timeout_seconds,
+                write_timeout=settings.telegram_write_timeout_seconds,
+                pool_timeout=settings.telegram_pool_timeout_seconds,
+            )
+        )
         .post_init(post_init)
         .post_shutdown(post_shutdown)
         .build()

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Any
 
@@ -26,6 +27,7 @@ class DigestSchedulingAdapter:
         self._clock = clock
         self._interval_seconds = interval_seconds
         self._job: Any | None = None
+        self._cycle_task: asyncio.Task[None] | None = None
 
     def start(self) -> None:
         if self._job is not None:
@@ -35,15 +37,28 @@ class DigestSchedulingAdapter:
             interval=self._interval_seconds,
             first=self._interval_seconds,
             name="digest-scheduling",
+            job_kwargs={
+                "coalesce": True,
+                "misfire_grace_time": self._interval_seconds,
+            },
         )
 
     def stop(self) -> None:
         if self._job is not None:
             self._job.schedule_removal()
             self._job = None
+        if self._cycle_task is not None and not self._cycle_task.done():
+            self._cycle_task.cancel()
+        self._cycle_task = None
 
     async def tick(self, context: object) -> None:
         del context
+        if self._cycle_task is not None and not self._cycle_task.done():
+            LOGGER.info("digest_cycle_already_running")
+            return
+        self._cycle_task = asyncio.create_task(self._run_cycle())
+
+    async def _run_cycle(self) -> None:
         now = self._clock.now()
         try:
             due_result = await self._execution_service.run_due_cycle(now)

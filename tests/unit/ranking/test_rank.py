@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import replace
 from datetime import timedelta
 from decimal import Decimal
+from unittest.mock import Mock
 from uuid import UUID, uuid4
 
 import pytest
@@ -286,7 +287,14 @@ async def test_rank_builds_identity_from_immutable_snapshot_and_replays_complete
 
 
 @pytest.mark.asyncio
-async def test_rank_retains_missing_analysis_candidate_as_ineligible() -> None:
+async def test_rank_retains_missing_analysis_candidate_as_ineligible(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    event_log = Mock()
+    monkeypatch.setattr(
+        "anxious_news_bot.ranking.services.rank.log_ranking_event",
+        event_log,
+    )
     user_id = _uuid(23)
     complete = article_snapshot(
         article_id=_uuid(140),
@@ -333,6 +341,17 @@ async def test_rank_retains_missing_analysis_candidate_as_ineligible() -> None:
         missing_record.eligibility_reason is EligibilityReason.MISSING_GENERIC_ANALYSIS
     )
     assert repository.persisted == result
+    summary = next(
+        call
+        for call in event_log.call_args_list
+        if call.args == ("ranking_eligibility_summary",)
+    )
+    assert summary.kwargs["fields"]["candidate_count"] == 2
+    assert summary.kwargs["fields"]["eligible_count"] == 1
+    assert summary.kwargs["fields"]["eligibility_reason_counts"] == {
+        "eligible": 1,
+        "missing_generic_analysis": 1,
+    }
 
 
 @pytest.mark.asyncio

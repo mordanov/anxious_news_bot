@@ -174,6 +174,29 @@ Event weights and thresholds are configurable with the `NEWS_EVENT_*` variables
 defined in `src/anxious_news_bot/config.py`. Keep credentials out of committed
 files and logs.
 
+### Diagnosing news shortages
+
+The application emits structured count-only diagnostics without article text:
+
+- `runtime_configuration` shows the effective VPS settings after environment
+  resolution.
+- `news_cycle_started`, `news_source_completed`, and `news_cycle_completed`
+  show due sources and fetched, accepted, rejected, and newly created counts.
+- `personal_news_candidates_prepared` and
+  `personal_news_evaluations_completed` show candidate and evaluation counts.
+- `ranking_eligibility_summary` groups exclusions by reason, including
+  `explicit_veto`, missing analysis, source quality, freshness, and duplicates.
+- `personal_news_selection_completed` shows the final requested, ranked, and
+  deliverable counts.
+
+For one `/news` request, filter the VPS logs by its `telegram-news:<update-id>`
+request ID and correlate it with the latest aggregation cycle:
+
+```bash
+docker compose logs anxious-news-bot \
+  | grep -E 'runtime_configuration|news_(cycle|source)|personal_news|ranking_eligibility_summary|diversity_'
+```
+
 Ranking and explicit-preference settings include:
 
 | Variable | Default | Purpose |

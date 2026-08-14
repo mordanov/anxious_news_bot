@@ -201,7 +201,10 @@ def _selected_records(article_ids):
     )
 
 
-async def test_evaluates_candidates_ranks_and_returns_selected_articles() -> None:
+async def test_evaluates_candidates_ranks_and_returns_selected_articles(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    caplog.set_level("INFO", logger="anxious_news_bot.ranking.services.news")
     user_id = uuid4()
     article_ids = (uuid4(), uuid4())
     repository = _RecordingRepository(
@@ -226,6 +229,15 @@ async def test_evaluates_candidates_ranks_and_returns_selected_articles() -> Non
     assert all(isinstance(item.score, Decimal) for item in result)
     assert len(evaluator.evaluated_article_ids) == 2
     assert len(ranker.calls) == 1
+    selection_record = next(
+        record
+        for record in caplog.records
+        if record.message == "personal_news_selection_completed"
+    )
+    assert selection_record.ranking["requested_count"] == 10
+    assert selection_record.ranking["candidate_count"] == 2
+    assert selection_record.ranking["delivery_item_count"] == 2
+    assert selection_record.ranking["shortage_count"] == 8
 
 
 # ---------------------------------------------------------------------------

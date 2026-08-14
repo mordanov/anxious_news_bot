@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from uuid import UUID
 
 from anxious_news_bot.ranking.domain import (
@@ -19,6 +20,8 @@ from anxious_news_bot.ranking.ports import (
 )
 from anxious_news_bot.ranking.services.evaluate import ArticleEvaluationService
 from anxious_news_bot.ranking.services.rank import PersonalRankingService
+
+LOGGER = logging.getLogger(__name__)
 
 
 class PersonalNewsService:
@@ -81,13 +84,63 @@ class PersonalNewsService:
             ranking_at=ranking_at,
             freshness_horizon_seconds=configuration.freshness_horizon_seconds,
         )
+        LOGGER.info(
+            "personal_news_candidates_prepared",
+            extra={
+                "ranking": {
+                    "event": "personal_news_candidates_prepared",
+                    "stage": "candidate_preparation",
+                    "status": "prepared",
+                    "user_id": str(user_id),
+                    "request_id": request_id,
+                    "requested_count": count,
+                    "candidate_limit": candidate_limit,
+                    "prepared_candidate_count": len(candidate_ids),
+                    "freshness_horizon_seconds": (
+                        configuration.freshness_horizon_seconds
+                    ),
+                }
+            },
+        )
 
         if candidate_filter is not None:
+            unfiltered_count = len(candidate_ids)
             filtered = await candidate_filter.filter(user_id, candidate_ids, ranking_at)
             candidate_ids = tuple(filtered.eligible_article_ids)
+            LOGGER.info(
+                "personal_news_candidates_filtered",
+                extra={
+                    "ranking": {
+                        "event": "personal_news_candidates_filtered",
+                        "stage": "candidate_filter",
+                        "status": "filtered",
+                        "user_id": str(user_id),
+                        "request_id": request_id,
+                        "input_candidate_count": unfiltered_count,
+                        "eligible_candidate_count": len(candidate_ids),
+                        "filtered_candidate_count": (
+                            unfiltered_count - len(candidate_ids)
+                        ),
+                    }
+                },
+            )
 
         if not candidate_ids:
             profile_revision = await self._repository.resolve_profile_revision(user_id)
+            LOGGER.warning(
+                "personal_news_candidate_shortage",
+                extra={
+                    "ranking": {
+                        "event": "personal_news_candidate_shortage",
+                        "stage": "candidate_preparation",
+                        "status": "empty",
+                        "user_id": str(user_id),
+                        "request_id": request_id,
+                        "requested_count": count,
+                        "candidate_count": 0,
+                    }
+                },
+            )
             return PersonalNewsSelection(
                 ranking_run_id=None,
                 profile_revision=profile_revision,
@@ -95,8 +148,27 @@ class PersonalNewsService:
                 items=(),
             )
 
-        if await self._repository.has_active_nonzero_preferences(user_id):
-            await self._evaluate_candidates(user_id, candidate_ids)
+        has_preferences = await self._repository.has_active_nonzero_preferences(user_id)
+        evaluation_counts = (0, 0, 0)
+        if has_preferences:
+            evaluation_counts = await self._evaluate_candidates(user_id, candidate_ids)
+        LOGGER.info(
+            "personal_news_evaluations_completed",
+            extra={
+                "ranking": {
+                    "event": "personal_news_evaluations_completed",
+                    "stage": "evaluation",
+                    "status": "complete",
+                    "user_id": str(user_id),
+                    "request_id": request_id,
+                    "candidate_count": len(candidate_ids),
+                    "has_active_preferences": has_preferences,
+                    "complete_evaluation_count": evaluation_counts[0],
+                    "incomplete_evaluation_count": evaluation_counts[1],
+                    "failed_evaluation_count": evaluation_counts[2],
+                }
+            },
+        )
 
         result = await self._ranker.rank(
             user_id,
@@ -106,6 +178,29 @@ class PersonalNewsService:
             ranking_at=ranking_at,
         )
         items = await self._load_ranked_items(result)
+        LOGGER.info(
+            "personal_news_selection_completed",
+            extra={
+                "ranking": {
+                    "event": "personal_news_selection_completed",
+                    "stage": "delivery_loading",
+                    "status": (
+                        "shortage" if len(items) < count else "complete"
+                    ),
+                    "user_id": str(user_id),
+                    "request_id": request_id,
+                    "ranking_run_id": str(result.ranking_run_id),
+                    "requested_count": count,
+                    "candidate_count": len(candidate_ids),
+                    "ranked_selected_count": result.selected_count,
+                    "delivery_item_count": len(items),
+                    "missing_delivery_article_count": (
+                        result.selected_count - len(items)
+                    ),
+                    "shortage_count": max(count - len(items), 0),
+                }
+            },
+        )
         return PersonalNewsSelection(
             ranking_run_id=result.ranking_run_id,
             profile_revision=result.identity.profile_revision,
@@ -149,16 +244,26 @@ class PersonalNewsService:
             if record.article_id in articles_by_id
         )
 
-    async def _evaluate_candidates(self, user_id, candidate_ids) -> None:
+    async def _evaluate_candidates(
+        self, user_id: UUID, candidate_ids: tuple[UUID, ...]
+    ) -> tuple[int, int, int]:
         semaphore = asyncio.Semaphore(self._evaluation_concurrency)
 
-        async def evaluate(article_id) -> None:
+        async def evaluate(article_id: UUID) -> str:
             async with semaphore:
                 try:
                     result = await self._evaluator.evaluate(user_id, article_id)
                     if result.status is not EvaluationStatus.COMPLETE:
-                        return
+                        return "incomplete"
                 except EvaluationError:
-                    return
+                    return "failed"
+                return "complete"
 
-        await asyncio.gather(*(evaluate(article_id) for article_id in candidate_ids))
+        outcomes = await asyncio.gather(
+            *(evaluate(article_id) for article_id in candidate_ids)
+        )
+        return (
+            outcomes.count("complete"),
+            outcomes.count("incomplete"),
+            outcomes.count("failed"),
+        )

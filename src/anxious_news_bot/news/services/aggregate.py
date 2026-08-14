@@ -4,6 +4,8 @@ import asyncio
 import hashlib
 import json
 import logging
+import time
+from collections import Counter
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Any
@@ -124,15 +126,32 @@ class DefaultNewsAggregator:
 
     async def run_cycle(self) -> AggregationResult:
         if not await self._repository.try_acquire_cycle_lock(self._cycle_lock_key):
+            LOGGER.info(
+                "news_cycle_skipped",
+                extra={"news": {"reason": "cycle_lock_already_held"}},
+            )
             return AggregationResult(AggregationStatus.ALREADY_RUNNING)
 
         cycle_id: UUID | None = None
+        cycle_started = time.monotonic()
         try:
             started_at = self._clock.now()
             async with self._repository.unit_of_work() as work:
                 cycle = await work.create_cycle(started_at, self._configuration_version)
                 cycle_id = cycle.id
                 sources = tuple(await work.list_due_sources(started_at))
+            LOGGER.info(
+                "news_cycle_started",
+                extra={
+                    "news": {
+                        "cycle_id": str(cycle.id),
+                        "due_source_count": len(sources),
+                        "due_source_ids": tuple(str(source.id) for source in sources),
+                        "max_concurrency": self._max_concurrency,
+                        "configuration_version": self._configuration_version,
+                    }
+                },
+            )
 
             semaphore = asyncio.Semaphore(self._max_concurrency)
 
@@ -175,6 +194,23 @@ class DefaultNewsAggregator:
                     source_success_count=success_count,
                     source_failure_count=failure_count,
                 )
+            LOGGER.info(
+                "news_cycle_completed",
+                extra={
+                    "news": {
+                        "cycle_id": str(cycle.id),
+                        "status": status.value,
+                        "due_source_count": len(sources),
+                        "source_success_count": success_count,
+                        "source_failure_count": failure_count,
+                        "new_article_count": len(created_ids),
+                        "post_processing_count": len(post_processing_ids),
+                        "duration_ms": round(
+                            (time.monotonic() - cycle_started) * 1000
+                        ),
+                    }
+                },
+            )
             return AggregationResult(
                 AggregationStatus(status.value),
                 cycle.id,
@@ -187,6 +223,17 @@ class DefaultNewsAggregator:
                 await asyncio.shield(self._finalize_cancelled_cycle(cycle_id))
             raise
         except Exception:
+            LOGGER.exception(
+                "news_cycle_failed",
+                extra={
+                    "news": {
+                        "cycle_id": str(cycle_id) if cycle_id is not None else None,
+                        "duration_ms": round(
+                            (time.monotonic() - cycle_started) * 1000
+                        ),
+                    }
+                },
+            )
             if cycle_id is not None:
                 async with self._repository.unit_of_work() as work:
                     await work.finalize_cycle(
@@ -205,6 +252,7 @@ class DefaultNewsAggregator:
         self, cycle_id: UUID, source: NewsSource
     ) -> tuple[bool, tuple[UUID, ...]]:
         observed_at = self._clock.now()
+        source_started = time.monotonic()
         created_ids: list[UUID] = []
         async with self._repository.unit_of_work() as work:
             source_run = await work.create_source_run(cycle_id, source.id, observed_at)
@@ -237,6 +285,17 @@ class DefaultNewsAggregator:
                         status=SourceRunStatus.NOT_MODIFIED.value,
                         completed_at=fetched_at,
                     )
+                    self._log_source_completed(
+                        cycle_id=cycle_id,
+                        source=source,
+                        status=SourceRunStatus.NOT_MODIFIED,
+                        fetched_count=0,
+                        accepted_count=0,
+                        rejected_count=0,
+                        new_article_count=0,
+                        rejection_code_counts={},
+                        started=source_started,
+                    )
                     return True, ()
 
                 await work.finalize_source_run(
@@ -246,10 +305,15 @@ class DefaultNewsAggregator:
                 )
                 accepted_count = 0
                 rejected_count = 0
+                rejection_code_counts: Counter[str] = Counter()
                 for raw in result.records:
                     normalization = self._normalizer.normalize(source, raw, observed_at)
                     if not normalization.accepted:
                         rejected_count += 1
+                        rejection_code = (
+                            normalization.rejection_code or "record_rejected"
+                        )
+                        rejection_code_counts[rejection_code] += 1
                         await work.record_source_article(
                             SourceArticleRecord(
                                 id=uuid4(),
@@ -261,8 +325,7 @@ class DefaultNewsAggregator:
                                 payload_hash=_raw_hash(raw),
                                 observed_at=observed_at,
                                 status=ProvenanceStatus.REJECTED,
-                                rejection_code=normalization.rejection_code
-                                or "record_rejected",
+                                rejection_code=rejection_code,
                             )
                         )
                         continue
@@ -293,6 +356,17 @@ class DefaultNewsAggregator:
                     accepted_count=accepted_count,
                     rejected_count=rejected_count,
                 )
+                self._log_source_completed(
+                    cycle_id=cycle_id,
+                    source=source,
+                    status=SourceRunStatus.SUCCEEDED,
+                    fetched_count=len(result.records),
+                    accepted_count=accepted_count,
+                    rejected_count=rejected_count,
+                    new_article_count=len(created_ids),
+                    rejection_code_counts=dict(sorted(rejection_code_counts.items())),
+                    started=source_started,
+                )
                 return True, tuple(created_ids)
         except asyncio.CancelledError:
             await asyncio.shield(self._finalize_cancelled_source(source_run.id))
@@ -301,10 +375,16 @@ class DefaultNewsAggregator:
             LOGGER.warning(
                 "news_source_failed",
                 extra={
-                    "source_id": str(source.id),
-                    "source_name": source.name,
-                    "error_code": exc.code,
-                    "error_context": exc.context.as_dict(),
+                    "news": {
+                        "cycle_id": str(cycle_id),
+                        "source_id": str(source.id),
+                        "source_name": source.name,
+                        "error_code": exc.code,
+                        "error_context": exc.context.as_dict(),
+                        "duration_ms": round(
+                            (time.monotonic() - source_started) * 1000
+                        ),
+                    }
                 },
             )
             async with self._repository.unit_of_work() as work:
@@ -315,7 +395,17 @@ class DefaultNewsAggregator:
         except Exception:
             LOGGER.exception(
                 "news_source_failed_unexpected",
-                extra={"source_id": str(source.id), "source_name": source.name},
+                extra={
+                    "news": {
+                        "cycle_id": str(cycle_id),
+                        "source_id": str(source.id),
+                        "source_name": source.name,
+                        "error_code": "unexpected_source_failure",
+                        "duration_ms": round(
+                            (time.monotonic() - source_started) * 1000
+                        ),
+                    }
+                },
             )
             async with self._repository.unit_of_work() as work:
                 await self._record_source_failure(
@@ -327,6 +417,37 @@ class DefaultNewsAggregator:
                     DiagnosticContext.sanitized({}),
                 )
             return False, ()
+
+    @staticmethod
+    def _log_source_completed(
+        *,
+        cycle_id: UUID,
+        source: NewsSource,
+        status: SourceRunStatus,
+        fetched_count: int,
+        accepted_count: int,
+        rejected_count: int,
+        new_article_count: int,
+        rejection_code_counts: dict[str, int],
+        started: float,
+    ) -> None:
+        LOGGER.info(
+            "news_source_completed",
+            extra={
+                "news": {
+                    "cycle_id": str(cycle_id),
+                    "source_id": str(source.id),
+                    "source_name": source.name,
+                    "status": status.value,
+                    "fetched_count": fetched_count,
+                    "accepted_count": accepted_count,
+                    "rejected_count": rejected_count,
+                    "rejection_code_counts": rejection_code_counts,
+                    "new_article_count": new_article_count,
+                    "duration_ms": round((time.monotonic() - started) * 1000),
+                }
+            },
+        )
 
     async def _finalize_cancelled_cycle(self, cycle_id: UUID) -> None:
         async with self._repository.unit_of_work() as work:

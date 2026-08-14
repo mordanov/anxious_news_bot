@@ -413,6 +413,49 @@ def build_application(settings: Settings) -> Application:
     )
 
     async def post_init(application: Application) -> None:
+        LOGGER.info(
+            "runtime_configuration",
+            extra={
+                "news": {
+                    "scheduler_interval_seconds": (
+                        settings.news_scheduler_interval_seconds
+                    ),
+                    "fetch_timeout_seconds": settings.news_fetch_timeout_seconds,
+                    "fetch_retry_attempts": settings.news_fetch_retry_attempts,
+                    "max_concurrency": settings.news_max_concurrency,
+                    "command_candidate_limit": settings.news_command_candidate_limit,
+                    "command_evaluation_concurrency": (
+                        settings.news_command_evaluation_concurrency
+                    ),
+                    "event_window_hours": settings.news_event_window_hours,
+                },
+                "ranking": {
+                    "event": "runtime_configuration",
+                    "stage": "startup",
+                    "status": "configured",
+                    "configuration_version": settings.ranking_configuration_version,
+                    "maximum_candidates": settings.ranking_maximum_candidates,
+                    "minimum_source_quality": str(
+                        settings.ranking_minimum_source_quality
+                    ),
+                    "event_cap": settings.ranking_event_cap,
+                    "topic_cap": settings.ranking_topic_cap,
+                    "source_cap": settings.ranking_source_cap,
+                    "explicit_weight_threshold": str(
+                        settings.ranking_explicit_weight_threshold
+                    ),
+                    "explicit_relevance_threshold": str(
+                        settings.ranking_explicit_relevance_threshold
+                    ),
+                },
+                "digest": {
+                    "scan_interval_seconds": settings.digest_scan_interval_seconds,
+                    "default_count": settings.digest_default_count,
+                    "candidate_limit": settings.digest_candidate_limit,
+                    "user_concurrency": settings.digest_user_concurrency,
+                },
+            },
+        )
         try:
             await application.bot.set_my_commands(_BOT_COMMANDS)
             LOGGER.info("Bot commands registered (%d)", len(_BOT_COMMANDS))

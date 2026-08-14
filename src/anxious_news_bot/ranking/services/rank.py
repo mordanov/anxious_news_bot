@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections import Counter
 from datetime import datetime
 from decimal import Decimal
 from uuid import UUID, uuid4
@@ -23,6 +24,7 @@ from anxious_news_bot.ranking.observability import (
     log_diversity_selection,
     log_diversity_shortage,
     log_diversity_veto,
+    log_ranking_event,
 )
 from anxious_news_bot.ranking.ports import (
     Clock,
@@ -193,6 +195,30 @@ class PersonalRankingService:
                     for article in articles
                 )
             )
+        )
+        eligibility_counts = Counter(
+            record.eligibility_reason.value for record in ordered_records
+        )
+        log_ranking_event(
+            "ranking_eligibility_summary",
+            stage="eligibility",
+            status="classified",
+            user_id=identity.user_id,
+            request_id=identity.request_id,
+            fields={
+                "candidate_count": len(ordered_records),
+                "eligible_count": sum(record.eligible for record in ordered_records),
+                "ineligible_count": sum(
+                    not record.eligible for record in ordered_records
+                ),
+                "explicit_veto_count": sum(
+                    record.explicit_veto for record in ordered_records
+                ),
+                "explicit_protected_count": sum(
+                    record.explicit_protected for record in ordered_records
+                ),
+                "eligibility_reason_counts": dict(sorted(eligibility_counts.items())),
+            },
         )
         diversity = self._selector.select(
             ordered_records,

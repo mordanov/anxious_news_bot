@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from datetime import datetime
 
+from sqlalchemy.exc import SQLAlchemyError
 from telegram import Update
 from telegram.ext import ContextTypes
 
@@ -46,7 +47,7 @@ class NewsTelegramAdapter:
         service: PersonalNewsService,
         language_service: UserLanguageService,
         translator: NewsTitleTranslator,
-        configuration_service: DigestConfigurationService | None = None,
+        configuration_service: DigestConfigurationService,
     ) -> None:
         self._service = service
         self._language_service = language_service
@@ -63,14 +64,12 @@ class NewsTelegramAdapter:
         language = await self._language_service.get(user.id, user.language_code)
         text = MESSAGES[language]
         status_message = await message.reply_text(text["processing"])
-        count = 10
-        if self._configuration_service is not None:
+        try:
             config = await self._configuration_service.get_current(
                 user.id,
                 user.language_code,
             )
             count = config.digest_count
-        try:
             items = await self._service.top(
                 user.id,
                 f"telegram-news:{update.update_id}",
@@ -80,7 +79,7 @@ class NewsTelegramAdapter:
                 tuple(item.article.title for item in items),
                 language,
             )
-        except RankingRunError:
+        except (RankingRunError, SQLAlchemyError):
             await status_message.edit_text(text["failed"])
             return
         except NewsTranslationError as exc:

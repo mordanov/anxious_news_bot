@@ -5,6 +5,8 @@ from decimal import Decimal
 from unittest.mock import AsyncMock, Mock
 from uuid import uuid4
 
+from sqlalchemy.exc import OperationalError
+
 from anxious_news_bot.preferences.domain import SupportedLanguage
 from anxious_news_bot.ranking.domain import DeliveryArticle, RankedNewsItem
 from anxious_news_bot.telegram.news import NewsTelegramAdapter
@@ -77,6 +79,9 @@ async def test_news_command_reports_translation_failure() -> None:
     service = Mock(top=AsyncMock(return_value=(item,)))
     language_service = Mock(get=AsyncMock(return_value=SupportedLanguage.SPANISH))
     translator = Mock(translate=AsyncMock(side_effect=NewsTranslationError("failed")))
+    configuration_service = Mock(
+        get_current=AsyncMock(return_value=Mock(digest_count=10))
+    )
     status_message = Mock(edit_text=AsyncMock())
     update = Mock(
         update_id=100,
@@ -84,12 +89,46 @@ async def test_news_command_reports_translation_failure() -> None:
         message=Mock(reply_text=AsyncMock(return_value=status_message)),
     )
 
-    await NewsTelegramAdapter(service, language_service, translator).command(
-        update, Mock()
-    )
+    await NewsTelegramAdapter(
+        service,
+        language_service,
+        translator,
+        configuration_service,
+    ).command(update, Mock())
 
     status_message.edit_text.assert_awaited_once_with(
         "No pude preparar tus noticias. Inténtalo de nuevo más tarde."
+    )
+
+
+async def test_news_command_reports_configuration_failure() -> None:
+    service = Mock(top=AsyncMock())
+    language_service = Mock(get=AsyncMock(return_value=SupportedLanguage.ENGLISH))
+    translator = Mock()
+    configuration_service = Mock(
+        get_current=AsyncMock(
+            side_effect=OperationalError("lookup", {}, RuntimeError("database"))
+        )
+    )
+    status_message = Mock(edit_text=AsyncMock())
+    update = Mock(
+        update_id=101,
+        effective_user=Mock(id=123, language_code="en"),
+        message=Mock(
+            reply_text=AsyncMock(return_value=status_message),
+        ),
+    )
+
+    await NewsTelegramAdapter(
+        service,
+        language_service,
+        translator,
+        configuration_service,
+    ).command(update, Mock())
+
+    service.top.assert_not_awaited()
+    status_message.edit_text.assert_awaited_once_with(
+        "I couldn't prepare your news selection. Please try again later."
     )
 
 

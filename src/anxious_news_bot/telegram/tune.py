@@ -84,7 +84,10 @@ class TuneTelegramAdapter:
             await query.answer()
         except BadRequest as exc:
             message = str(exc).lower()
-            if "query is too old" not in message and "query id is invalid" not in message:
+            if (
+                "query is too old" not in message
+                and "query id is invalid" not in message
+            ):
                 raise
             LOGGER.info(
                 "tune_callback_acknowledgement_expired",

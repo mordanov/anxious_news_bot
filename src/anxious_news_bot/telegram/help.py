@@ -18,6 +18,7 @@ HELP_MESSAGES = {
 /news - Получить персонализированные новости
 /tune - Настроить ваши предпочтения
 /specify - Добавить явное предпочтение
+/my - Показать мои предпочтения
 /count - Установить размер дайджеста (5-20)
 /help - Показать эту справку
 
@@ -29,6 +30,7 @@ HELP_MESSAGES = {
 /news - Get personalized news
 /tune - Customize your preferences
 /specify - Add an explicit preference
+/my - View my preferences
 /count - Set digest size (5-20)
 /help - Show this help message
 
@@ -40,6 +42,7 @@ Start with /tune to customize your preferences or use /language to change the la
 /news - Obtener noticias personalizadas
 /tune - Personalizar tus preferencias
 /specify - Añadir una preferencia explícita
+/my - Ver mis preferencias
 /count - Establecer tamaño del resumen (5-20)
 /help - Mostrar esta ayuda
 

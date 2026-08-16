@@ -143,6 +143,7 @@ class ExplicitPreferenceService:
                     normalized_statement,
                     profile,
                     history,
+                    language_code,
                 )
             except InterpretationFailed:
                 log_preference_event(

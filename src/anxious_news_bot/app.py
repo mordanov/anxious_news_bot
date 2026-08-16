@@ -110,6 +110,7 @@ from anxious_news_bot.ranking.services.rank import PersonalRankingService
 from anxious_news_bot.ranking.services.retention import RankingRetentionService
 from anxious_news_bot.ranking.services.score import DeterministicRankingScorer
 from anxious_news_bot.telegram.count import CountTelegramAdapter
+from anxious_news_bot.telegram.my import MyTelegramAdapter
 from anxious_news_bot.telegram.digest import TelegramDigestDelivery
 from anxious_news_bot.telegram.help import HelpTelegramAdapter
 from anxious_news_bot.telegram.language import (
@@ -130,6 +131,7 @@ _BOT_COMMANDS = [
     BotCommand("news", "Get personalized news"),
     BotCommand("tune", "Customize your preferences"),
     BotCommand("specify", "Add an explicit preference"),
+    BotCommand("my", "View my preferences"),
     BotCommand("count", "Set digest size (5-20)"),
     BotCommand("help", "Show available commands"),
 ]
@@ -409,6 +411,7 @@ def build_application(settings: Settings) -> Application:
         digest_config_service,
         language_service,
     )
+    my_adapter = MyTelegramAdapter(preference_repository, language_service)
     news_adapter = NewsTelegramAdapter(
         personal_news_service,
         language_service,
@@ -568,6 +571,7 @@ def build_application(settings: Settings) -> Application:
     application.add_handler(CommandHandler("tune", tune_adapter.command))
     application.add_handler(CommandHandler("specify", specify_adapter.command))
     application.add_handler(CommandHandler("count", count_adapter.command))
+    application.add_handler(CommandHandler("my", my_adapter.command))
     application.add_handler(
         CallbackQueryHandler(
             language_adapter.callback,

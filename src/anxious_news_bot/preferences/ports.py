@@ -44,6 +44,7 @@ class ExplicitPreferenceInterpreter(Protocol):
         statement: str,
         profile_snapshot: ProfileSnapshot,
         relevant_history: Sequence[Mapping[str, Any]],
+        language_code: str | None = None,
     ) -> Mapping[str, Any]: ...
 
 
@@ -160,6 +161,11 @@ class PreferenceRepositoryPort(Protocol):
         error_code: str,
         failed_at: datetime,
     ) -> SpecifyState: ...
+
+    async def load_profile(
+        self,
+        telegram_user_id: int,
+    ) -> ProfileSnapshot | None: ...
 
     async def duplicate_candidates(
         self,

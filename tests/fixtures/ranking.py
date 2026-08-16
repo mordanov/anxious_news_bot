@@ -56,6 +56,7 @@ class DeterministicExplicitInterpreter:
         statement: str,
         profile_snapshot: ProfileSnapshot,
         relevant_history: Sequence[Mapping[str, Any]],
+        language_code: str | None = None,
     ) -> Mapping[str, Any]:
         del profile_snapshot, relevant_history
         self.calls.append((request_id, statement))

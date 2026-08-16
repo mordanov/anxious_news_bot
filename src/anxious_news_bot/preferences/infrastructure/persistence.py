@@ -846,6 +846,20 @@ class SQLAlchemyPreferenceRepository:
                 request.updated_at = failed_at
             return await self._explicit_state(session, request)
 
+    async def load_profile(self, telegram_user_id: int) -> ProfileSnapshot | None:
+        async with self._database.session() as session:
+            user = await session.scalar(
+                select(ApplicationUser).where(
+                    ApplicationUser.telegram_user_id == telegram_user_id
+                )
+            )
+            if user is None:
+                return None
+            profile = await session.get(PreferenceProfile, user.id)
+            if profile is None:
+                return None
+            return await self._snapshot(session, user.id)
+
     async def duplicate_candidates(
         self,
         user_id: UUID,

@@ -168,21 +168,28 @@ class StructuredPreferenceModelAdapter:
         statement: str,
         profile_snapshot: ProfileSnapshot,
         relevant_history: Sequence[Mapping[str, Any]],
+        language_code: str | None = None,
     ) -> Mapping[str, Any]:
         if not self._configured:
             raise InterpretationFailed("preference model is not configured")
+        language = normalize_language_code(language_code)
+        language_names = {"ru": "Русский", "en": "English", "es": "Español"}
+        output_language = language_names[language.value]
         prompt = {
             "request_id": str(request_id),
             "schema_version": "1.0",
             "interpretation_version": EXPLICIT_INTERPRETATION_VERSION,
             "statement": statement,
+            "output_language": output_language,
             "profile": self._profile(profile_snapshot),
             "relevant_history": [
                 dict(item) for item in relevant_history[: self._explicit_history_limit]
             ],
             "instructions": (
-                "Interpret one explicit news-preference statement as an incremental "
-                "change set. Keep specific intent specific. Preserve every named "
+                f"Interpret one explicit news-preference statement as an incremental "
+                f"change set. Write name, description, and evaluation_instructions "
+                f"only in {output_language}, matching the statement's language. "
+                "Keep specific intent specific. Preserve every named "
                 "place, person, organization, and topic verbatim in the descriptive "
                 "fields. Encode named entities in semantic_key using a stable ASCII "
                 "transliteration; for example, Russian 'Киров' becomes "

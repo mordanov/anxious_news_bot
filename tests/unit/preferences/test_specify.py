@@ -128,7 +128,7 @@ class InspectingInterpreter(DeterministicExplicitInterpreter):
         self.histories = []
 
     async def interpret(
-        self, request_id, statement, profile_snapshot, relevant_history
+        self, request_id, statement, profile_snapshot, relevant_history, language_code=None
     ):
         assert self.repository.transaction_open is False
         self.histories.append(tuple(relevant_history))
@@ -156,7 +156,7 @@ class AdaptiveInterpreter:
         self.calls = 0
 
     async def interpret(
-        self, request_id, statement, profile_snapshot, relevant_history
+        self, request_id, statement, profile_snapshot, relevant_history, language_code=None
     ):
         del statement, relevant_history
         self.calls += 1

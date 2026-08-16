@@ -122,9 +122,9 @@ class SpecifyTelegramAdapter:
             SpecifyStateKind.PROCESSING: messages["processing"],
             SpecifyStateKind.APPLIED: state.message or messages["applied"],
             SpecifyStateKind.NO_CHANGE: state.message or messages["no_change"],
-            SpecifyStateKind.INVALID: state.message or messages["invalid"],
-            SpecifyStateKind.STALE_RETRY: state.message or messages["stale_retry"],
-            SpecifyStateKind.FAILED: state.message or messages["failed"],
+            SpecifyStateKind.INVALID: messages["invalid"],
+            SpecifyStateKind.STALE_RETRY: messages["stale_retry"],
+            SpecifyStateKind.FAILED: messages["failed"],
         }
         await reply(state_messages[state.kind])
 

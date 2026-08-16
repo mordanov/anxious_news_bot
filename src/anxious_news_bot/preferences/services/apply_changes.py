@@ -72,12 +72,14 @@ class DeterministicPreferenceChangeValidator:
     ) -> PreferenceChangesSchema:
         by_id = {parameter.id: parameter for parameter in profile.parameters}
         by_key = {parameter.semantic_key: parameter for parameter in profile.parameters}
+        valid_changes = []
         for change in proposal.changes:
             if isinstance(change, CreateChangeSchema):
                 if change.semantic_key in by_key:
                     raise PreferenceProposalInvalid(
                         "equivalent preference parameter already exists"
                     )
+                valid_changes.append(change)
                 continue
             parameter = by_id.get(change.parameter_id)
             if parameter is None:
@@ -86,8 +88,21 @@ class DeterministicPreferenceChangeValidator:
                 raise PreferenceProposalInvalid(
                     "questionnaire batches may mutate only questionnaire parameters"
                 )
-            DeterministicPreferenceChangeValidator._validate_mutation(change, parameter)
-        return proposal
+            try:
+                DeterministicPreferenceChangeValidator._validate_mutation(
+                    change, parameter
+                )
+                valid_changes.append(change)
+            except PreferenceProposalInvalid:
+                pass  # drop no-op mutations silently
+        if len(valid_changes) == len(proposal.changes):
+            return proposal
+        return PreferenceChangesSchema.model_construct(
+            schema_version=proposal.schema_version,
+            questionnaire_id=proposal.questionnaire_id,
+            base_profile_revision=proposal.base_profile_revision,
+            changes=tuple(valid_changes),
+        )
 
     def _validate_explicit(
         self,

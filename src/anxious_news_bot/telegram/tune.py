@@ -25,6 +25,7 @@ MESSAGES = {
         "generating": "Создаю анкету предпочтений...",
         "processing": "Обновляю ваши предпочтения...",
         "completed": "Ваши новостные предпочтения обновлены.",
+        "no_change": "Ваши предпочтения уже актуальны.",
         "failed": "Настройка предпочтений не удалась. Отправьте /tune ещё раз.",
     },
     SupportedLanguage.ENGLISH: {
@@ -34,6 +35,7 @@ MESSAGES = {
         "generating": "Creating your preference questionnaire...",
         "processing": "Updating your preferences...",
         "completed": "Your news preferences have been updated.",
+        "no_change": "Your preferences are already up to date.",
         "failed": "Preference tuning failed. Send /tune to try again.",
     },
     SupportedLanguage.SPANISH: {
@@ -43,6 +45,7 @@ MESSAGES = {
         "generating": "Creando tu cuestionario de preferencias...",
         "processing": "Actualizando tus preferencias...",
         "completed": "Tus preferencias de noticias se han actualizado.",
+        "no_change": "Tus preferencias ya están actualizadas.",
         "failed": "No se pudieron ajustar las preferencias. Envía /tune de nuevo.",
     },
 }
@@ -133,6 +136,7 @@ class TuneTelegramAdapter:
                 TuneStateKind.GENERATING: MESSAGES[language]["generating"],
                 TuneStateKind.PROCESSING: MESSAGES[language]["processing"],
                 TuneStateKind.COMPLETED: MESSAGES[language]["completed"],
+                TuneStateKind.NO_CHANGE: MESSAGES[language]["no_change"],
                 TuneStateKind.FAILED: MESSAGES[language]["failed"],
             }
             await status_message.edit_text(state_messages[state.kind])

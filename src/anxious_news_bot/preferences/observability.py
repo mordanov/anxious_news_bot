@@ -19,6 +19,18 @@ _SAFE_REASONS = frozenset(
         "question substantially repeats prior context",
         "equivalent preference parameter already exists",
         "request would not change preferences",
+        "questionnaire id does not match",
+        "request id does not match",
+        "base profile revision does not match",
+        "unknown preference parameter",
+        "questionnaire batches may mutate only questionnaire parameters",
+        "adjust must change the weight",
+        "refine must change descriptive data",
+        "deactivate must change the active state",
+        "reactivate must change the active state",
+        "explicit statement is required",
+        "duplicate resolution points to an unknown parameter",
+        "unsupported change action",
     }
 )
 

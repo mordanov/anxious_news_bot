@@ -141,10 +141,14 @@ class StructuredPreferenceModelAdapter:
                 for question, option in answers
             ],
             "instructions": (
-                "Propose incremental preference changes. Create values have "
-                "questionnaire origin assigned by the application. Target only "
-                "questionnaire-origin parameters; explicit, inference, and system "
-                "parameters are read-only. Use canonical two-decimal weights."
+                "Propose incremental preference changes based on the answers. "
+                "Target only questionnaire-origin parameters; explicit, inference, "
+                "and system parameters are read-only — do not include them in changes. "
+                "For adjust changes the new target_weight must differ from the "
+                "current weight; for refine changes at least one field must differ "
+                "from the current value. "
+                "Weights must be exactly four characters: '0.25', '0.50', '0.75', "
+                "'1.00', etc. — never '0.5' or '0.500'."
             ),
         }
         try:

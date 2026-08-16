@@ -1304,20 +1304,10 @@ class SQLAlchemyRankingRepository:
         session: AsyncSession,
         configuration: RankingConfiguration,
     ) -> None:
-        existing = await session.get(
-            models.RankingConfigurationSnapshot,
-            configuration.version,
-        )
         configuration_hash = canonical_configuration_hash(configuration)
-        if existing is not None:
-            if existing.configuration_hash != configuration_hash:
-                raise RankingConfigurationError(
-                    "configuration version already persists different values",
-                    code="configuration_version_conflict",
-                )
-            return
-        session.add(
-            models.RankingConfigurationSnapshot(
+        stmt = (
+            insert(models.RankingConfigurationSnapshot)
+            .values(
                 version=configuration.version,
                 configuration_hash=configuration_hash,
                 personal_coefficient=configuration.personal_coefficient,
@@ -1338,8 +1328,20 @@ class SQLAlchemyRankingRepository:
                 tie_policy_version=configuration.tie_policy_version,
                 retention_policy_version=configuration.retention_policy_version,
             )
+            .on_conflict_do_nothing(index_elements=["version"])
         )
+        await session.execute(stmt)
         await session.flush()
+        existing = await session.get(
+            models.RankingConfigurationSnapshot,
+            configuration.version,
+            populate_existing=True,
+        )
+        if existing is not None and existing.configuration_hash != configuration_hash:
+            raise RankingConfigurationError(
+                "configuration version already persists different values",
+                code="configuration_version_conflict",
+            )
 
     @staticmethod
     def _ensure_same_request_identity(

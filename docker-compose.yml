@@ -108,6 +108,7 @@ services:
   db-init:
     build:
       context: .
+    image: ghcr.io/mordanov/anxious-news-bot:latest
     command: ["python", "docker/ensure_database.py"]
     environment:
       <<: *database-environment
@@ -119,6 +120,7 @@ services:
   migrate:
     build:
       context: .
+    image: ghcr.io/mordanov/anxious-news-bot:latest
     command: ["alembic", "upgrade", "head"]
     environment:
       <<: *application-environment
@@ -130,6 +132,7 @@ services:
   sources-init:
     build:
       context: .
+    image: ghcr.io/mordanov/anxious-news-bot:latest
     command: ["anxious-news-sources", "apply", "/app/sources.json"]
     environment:
       <<: *application-environment
@@ -141,6 +144,7 @@ services:
   bot:
     build:
       context: .
+    image: ghcr.io/mordanov/anxious-news-bot:latest
     environment:
       <<: *application-environment
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:?Set TELEGRAM_BOT_TOKEN in .env}

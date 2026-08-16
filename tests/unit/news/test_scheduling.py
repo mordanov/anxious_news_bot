@@ -46,18 +46,14 @@ async def test_scheduler_treats_already_running_as_normal_tick_result() -> None:
     aggregator.run_cycle.assert_awaited_once_with()
 
 
-async def test_application_starts_scheduler_and_closes_resources(monkeypatch) -> None:
+async def test_application_closes_resources_on_shutdown(monkeypatch) -> None:
     database = Mock()
     database.engine = Mock()
     database.close = AsyncMock()
     client = Mock()
     client.aclose = AsyncMock()
-    scheduler = Mock()
     monkeypatch.setattr(app_module, "Database", Mock(return_value=database))
     monkeypatch.setattr(app_module.httpx, "AsyncClient", Mock(return_value=client))
-    monkeypatch.setattr(
-        app_module, "AggregationScheduler", Mock(return_value=scheduler)
-    )
     application = app_module.build_application(Settings(telegram_bot_token="123:ABC"))
 
     assert application.post_init is not None
@@ -65,7 +61,5 @@ async def test_application_starts_scheduler_and_closes_resources(monkeypatch) ->
     await application.post_init(application)
     await application.post_shutdown(application)
 
-    scheduler.start.assert_called_once_with()
-    scheduler.stop.assert_called_once_with()
     client.aclose.assert_awaited_once_with()
     database.close.assert_awaited_once_with()

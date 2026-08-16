@@ -160,17 +160,11 @@ async def test_application_registers_and_stops_ranking_retention_scheduler(
     database.close = AsyncMock()
     client = Mock()
     client.aclose = AsyncMock()
-    aggregation_scheduler = Mock()
     preference_scheduler = Mock()
     ranking_scheduler = Mock()
 
     monkeypatch.setattr(app_module, "Database", Mock(return_value=database))
     monkeypatch.setattr(app_module.httpx, "AsyncClient", Mock(return_value=client))
-    monkeypatch.setattr(
-        app_module,
-        "AggregationScheduler",
-        Mock(return_value=aggregation_scheduler),
-    )
     monkeypatch.setattr(
         app_module,
         "PreferenceRetentionScheduler",

@@ -110,13 +110,13 @@ from anxious_news_bot.ranking.services.rank import PersonalRankingService
 from anxious_news_bot.ranking.services.retention import RankingRetentionService
 from anxious_news_bot.ranking.services.score import DeterministicRankingScorer
 from anxious_news_bot.telegram.count import CountTelegramAdapter
-from anxious_news_bot.telegram.my import MyTelegramAdapter
 from anxious_news_bot.telegram.digest import TelegramDigestDelivery
 from anxious_news_bot.telegram.help import HelpTelegramAdapter
 from anxious_news_bot.telegram.language import (
     CALLBACK_PREFIX as LANGUAGE_CALLBACK_PREFIX,
 )
 from anxious_news_bot.telegram.language import LanguageTelegramAdapter
+from anxious_news_bot.telegram.my import MyTelegramAdapter
 from anxious_news_bot.telegram.news import NewsTelegramAdapter
 from anxious_news_bot.telegram.news_translation import StructuredNewsTitleTranslator
 from anxious_news_bot.telegram.specify import SpecifyTelegramAdapter

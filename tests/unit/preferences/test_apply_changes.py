@@ -11,7 +11,6 @@ from anxious_news_bot.preferences.domain import (
     PreferenceParameter,
     ProfileSnapshot,
 )
-from anxious_news_bot.preferences.errors import PreferenceProposalInvalid
 from anxious_news_bot.preferences.schemas import PreferenceChangesSchema
 from anxious_news_bot.preferences.services.apply_changes import (
     DeterministicPreferenceChangeValidator,
@@ -89,11 +88,11 @@ def test_proposal_hash_is_stable() -> None:
         },
     ],
 )
-def test_rejects_unchanged_actions(change) -> None:
+def test_filters_unchanged_questionnaire_actions(change) -> None:
     parameter = _parameter()
     qid = uuid4()
     profile = ProfileSnapshot(parameter.user_id, 1, (parameter,))
-    with pytest.raises(PreferenceProposalInvalid):
-        DeterministicPreferenceChangeValidator().validate(
-            _proposal(qid, 1, change(parameter)), profile, qid
-        )
+    result = DeterministicPreferenceChangeValidator().validate(
+        _proposal(qid, 1, change(parameter)), profile, qid
+    )
+    assert len(result.changes) == 0

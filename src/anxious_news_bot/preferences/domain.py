@@ -69,6 +69,7 @@ class TuneStateKind(StrEnum):
     QUESTION = "question"
     PROCESSING = "processing"
     COMPLETED = "completed"
+    NO_CHANGE = "no_change"
     FAILED = "failed"
 
 

@@ -69,11 +69,26 @@ class TuneTelegramAdapter:
             update.effective_user.id,
             update.effective_user.language_code,
         )
+        status_message = await update.message.reply_text(
+            MESSAGES[language]["generating"]
+        )
         state = await self._service.start_or_resume(
             update.effective_user.id,
             language.value,
         )
-        await self._render_message(update.message.reply_text, state, language)
+        if state.kind is TuneStateKind.QUESTION:
+            await self._render_message(status_message.edit_text, state, language)
+        else:
+            state_messages = {
+                TuneStateKind.GENERATING: MESSAGES[language]["generating"],
+                TuneStateKind.PROCESSING: MESSAGES[language]["processing"],
+                TuneStateKind.COMPLETED: MESSAGES[language]["completed"],
+                TuneStateKind.NO_CHANGE: MESSAGES[language]["no_change"],
+                TuneStateKind.FAILED: MESSAGES[language]["failed"],
+            }
+            await status_message.edit_text(
+                state_messages.get(state.kind, MESSAGES[language]["failed"])
+            )
 
     async def callback(
         self, update: Update, context: ContextTypes.DEFAULT_TYPE

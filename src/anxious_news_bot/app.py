@@ -1,6 +1,5 @@
 import logging
 import os
-from decimal import Decimal
 from pathlib import Path
 
 import httpx
@@ -36,22 +35,7 @@ from anxious_news_bot.infrastructure.users import (
     DigestDefaults,
 )
 from anxious_news_bot.logging import configure_logging
-from anxious_news_bot.news.domain import SourceType
 from anxious_news_bot.news.infrastructure.database import Database
-from anxious_news_bot.news.infrastructure.feeds import FeedFetcher
-from anxious_news_bot.news.infrastructure.persistence import SQLAlchemyNewsRepository
-from anxious_news_bot.news.infrastructure.scheduling import AggregationScheduler
-from anxious_news_bot.news.services.aggregate import DefaultNewsAggregator, SystemClock
-from anxious_news_bot.news.services.canonicalize import CanonicalURLPolicy
-from anxious_news_bot.news.services.deduplicate import (
-    DeterministicArticleDeduplicator,
-)
-from anxious_news_bot.news.services.event_grouping import DeterministicEventGrouper
-from anxious_news_bot.news.services.normalize import DeterministicArticleNormalizer
-from anxious_news_bot.news.services.source_catalog import (
-    SourceAdapterRegistry,
-    SourceAdapterRouter,
-)
 from anxious_news_bot.preferences.infrastructure.llm import (
     StructuredPreferenceModelAdapter,
 )
@@ -179,55 +163,6 @@ def build_application(settings: Settings) -> Application:
     database = Database(settings.database_url)
     client = httpx.AsyncClient(
         timeout=httpx.Timeout(settings.news_fetch_timeout_seconds)
-    )
-    repository = SQLAlchemyNewsRepository(database)
-    feed_adapter = FeedFetcher(
-        client,
-        retry_attempts=settings.news_fetch_retry_attempts,
-    )
-    source_adapters = SourceAdapterRegistry(
-        {
-            SourceType.RSS: feed_adapter,
-            SourceType.ATOM: feed_adapter,
-        }
-    )
-    fetcher = SourceAdapterRouter(source_adapters)
-    normalizer = DeterministicArticleNormalizer(
-        CanonicalURLPolicy(
-            version=settings.news_url_policy_version,
-            tracking_parameters=settings.news_tracking_parameters,
-        )
-    )
-    aggregator = DefaultNewsAggregator(
-        repository,
-        fetcher,
-        normalizer,
-        SystemClock(),
-        deduplicator=DeterministicArticleDeduplicator(
-            title_threshold=Decimal(str(settings.news_near_duplicate_title_threshold)),
-            content_threshold=Decimal(
-                str(settings.news_near_duplicate_content_threshold)
-            ),
-            review_threshold=Decimal(
-                str(settings.news_near_duplicate_review_threshold)
-            ),
-        ),
-        duplicate_candidate_minimum_similarity=(
-            settings.news_near_duplicate_review_threshold
-        ),
-        event_grouper=DeterministicEventGrouper(
-            window_hours=settings.news_event_window_hours,
-            title_weight=Decimal(str(settings.news_event_title_weight)),
-            content_weight=Decimal(str(settings.news_event_content_weight)),
-            topic_weight=Decimal(str(settings.news_event_topic_weight)),
-            geography_weight=Decimal(str(settings.news_event_geography_weight)),
-            anchor_threshold=Decimal(str(settings.news_event_anchor_threshold)),
-            assignment_threshold=Decimal(str(settings.news_event_assignment_threshold)),
-            review_threshold=Decimal(str(settings.news_event_review_threshold)),
-        ),
-        event_window_hours=settings.news_event_window_hours,
-        max_concurrency=settings.news_max_concurrency,
-        configuration_version=settings.news_url_policy_version,
     )
     user_provisioner = ApplicationUserProvisioner(
         DigestDefaults(
@@ -429,17 +364,10 @@ def build_application(settings: Settings) -> Application:
             "runtime_configuration",
             extra={
                 "news": {
-                    "scheduler_interval_seconds": (
-                        settings.news_scheduler_interval_seconds
-                    ),
-                    "fetch_timeout_seconds": settings.news_fetch_timeout_seconds,
-                    "fetch_retry_attempts": settings.news_fetch_retry_attempts,
-                    "max_concurrency": settings.news_max_concurrency,
                     "command_candidate_limit": settings.news_command_candidate_limit,
                     "command_evaluation_concurrency": (
                         settings.news_command_evaluation_concurrency
                     ),
-                    "event_window_hours": settings.news_event_window_hours,
                     "logical_cpu_count": os.cpu_count(),
                     "cgroup_cpu_limit": _runtime_limit("/sys/fs/cgroup/cpu.max"),
                     "cgroup_memory_limit": _runtime_limit("/sys/fs/cgroup/memory.max"),
@@ -478,13 +406,6 @@ def build_application(settings: Settings) -> Application:
             LOGGER.warning("Failed to register bot commands: %s", e)
         if application.job_queue is None:
             raise RuntimeError("Telegram JobQueue is required")
-        scheduler = AggregationScheduler(
-            application.job_queue,
-            aggregator,
-            interval_seconds=settings.news_scheduler_interval_seconds,
-        )
-        application.bot_data["news_scheduler"] = scheduler
-        scheduler.start()
         retention_scheduler = PreferenceRetentionScheduler(
             application.job_queue,
             retention_service,
@@ -518,8 +439,6 @@ def build_application(settings: Settings) -> Application:
         digest_retention_scheduler.start()
 
     async def post_shutdown(application: Application) -> None:
-        scheduler = application.bot_data.pop("news_scheduler", None)
-        _stop_scheduler(scheduler)
         retention_scheduler = application.bot_data.pop(
             "preference_retention_scheduler", None
         )

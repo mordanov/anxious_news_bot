@@ -205,8 +205,8 @@ class RankingPreference:
         parse_exact_decimal(
             self.weight,
             places=2,
-            minimum=Decimal("-1.00"),
-            maximum=Decimal("1.00"),
+            minimum=Decimal("-5.00"),
+            maximum=Decimal("5.00"),
         )
         if not isinstance(self.origin, PreferenceOrigin):
             raise TypeError("origin must be a PreferenceOrigin")
@@ -473,8 +473,8 @@ class ContributionSnapshot:
         parse_exact_decimal(
             self.weight,
             places=2,
-            minimum=Decimal("-1.00"),
-            maximum=Decimal("1.00"),
+            minimum=Decimal("-5.00"),
+            maximum=Decimal("5.00"),
         )
         parse_exact_decimal(
             self.relevance,
@@ -485,8 +485,8 @@ class ContributionSnapshot:
         parse_exact_decimal(
             self.contribution,
             places=8,
-            minimum=Decimal("-1.00000000"),
-            maximum=Decimal("1.00000000"),
+            minimum=Decimal("-5.00000000"),
+            maximum=Decimal("5.00000000"),
         )
 
 

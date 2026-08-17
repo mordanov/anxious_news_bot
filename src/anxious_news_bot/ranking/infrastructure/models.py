@@ -550,7 +550,7 @@ class RankingParameterContribution(Base):
             name="ck_ranking_parameter_contributions_parameter_name",
         ),
         CheckConstraint(
-            "weight >= -1.00 AND weight <= 1.00",
+            "weight >= -5.00 AND weight <= 5.00",
             name="ck_ranking_parameter_contributions_weight",
         ),
         CheckConstraint(
@@ -558,7 +558,7 @@ class RankingParameterContribution(Base):
             name="ck_ranking_parameter_contributions_relevance",
         ),
         CheckConstraint(
-            "contribution >= -1.00000000 AND contribution <= 1.00000000",
+            "contribution >= -5.00000000 AND contribution <= 5.00000000",
             name="ck_ranking_parameter_contributions_contribution",
         ),
         CheckConstraint(

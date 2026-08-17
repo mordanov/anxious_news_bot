@@ -222,4 +222,8 @@ def available_dimensions(
             dimension.key,
         ),
     )
-    return tuple((unseen + previously_seen)[: max(minimum, len(unseen))])
+    combined = unseen + previously_seen
+    if not unseen:
+        # All dimensions explored — return all so the model can pick any 10 freely.
+        return tuple(combined)
+    return tuple(combined[:minimum])

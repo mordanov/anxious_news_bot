@@ -61,13 +61,11 @@ def test_rotates_least_used_and_least_recent_dimensions_after_catalog_exhaustion
 
     selected = available_dimensions((), context)
 
-    assert len(selected) == 10
-    assert all(
-        next(
-            item.exposure_count
-            for item in context
-            if item.dimension_key == dimension.key
-        )
-        == 1
-        for dimension in selected
-    )
+    # When all dimensions are explored, return all of them so the model can pick freely.
+    assert len(selected) == len(DIMENSIONS)
+    # Still sorted: exposure_count=1 dimensions come before exposure_count=2 ones.
+    counts = [
+        next(item.exposure_count for item in context if item.dimension_key == d.key)
+        for d in selected
+    ]
+    assert counts == sorted(counts)

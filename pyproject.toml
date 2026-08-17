@@ -31,6 +31,7 @@ dev = [
 [project.scripts]
 anxious-news-bot = "anxious_news_bot.app:main"
 anxious-news-aggregator = "anxious_news_bot.aggregator_app:main"
+anxious-news-digest = "anxious_news_bot.digest_app:main"
 anxious-news-sources = "anxious_news_bot.news.cli:main"
 
 [tool.pytest.ini_options]

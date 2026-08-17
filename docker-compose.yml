@@ -154,6 +154,20 @@ services:
     init: true
     restart: unless-stopped
 
+  digest:
+    build:
+      context: .
+    image: ghcr.io/mordanov/anxious-news-bot:latest
+    command: ["anxious-news-digest"]
+    environment:
+      <<: *application-environment
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:?Set TELEGRAM_BOT_TOKEN in .env}
+    depends_on:
+      sources-init:
+        condition: service_completed_successfully
+    init: true
+    restart: unless-stopped
+
   bot:
     build:
       context: .

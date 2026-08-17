@@ -89,6 +89,25 @@ DIMENSIONS = (
     QuestionnaireDimension("historical_context", "amount of historical background"),
     QuestionnaireDimension("expert_commentary", "importance of expert interpretation"),
     QuestionnaireDimension("actionability", "information that enables concrete action"),
+    QuestionnaireDimension("topic_law", "interest in courts, legal cases, and judicial decisions"),
+    QuestionnaireDimension("topic_entertainment", "interest in film, television, music, and celebrity"),
+    QuestionnaireDimension("topic_religion", "interest in religion, faith, and spiritual affairs"),
+    QuestionnaireDimension("topic_defense", "interest in military affairs and national security"),
+    QuestionnaireDimension(
+        "topic_personal_finance", "interest in personal finance, investing, and wealth management"
+    ),
+    QuestionnaireDimension("geopolitics", "interest in international relations and foreign policy"),
+    QuestionnaireDimension(
+        "source_transparency",
+        "importance of bylines, sourcing, corrections, and editorial independence",
+    ),
+    QuestionnaireDimension("reading_level", "preferred vocabulary complexity and reading level"),
+    QuestionnaireDimension(
+        "visual_richness", "preference for data visualizations, infographics, and charts"
+    ),
+    QuestionnaireDimension(
+        "cross_discipline", "interest in articles bridging multiple fields or disciplines"
+    ),
 )
 DIMENSION_BY_KEY = {dimension.key: dimension for dimension in DIMENSIONS}
 

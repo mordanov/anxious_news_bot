@@ -92,7 +92,7 @@ class PreferenceParameter(TimestampMixin, Base):
             "user_id", "semantic_key", name="uq_preference_parameters_user_semantic"
         ),
         CheckConstraint(
-            "weight >= -1.00 AND weight <= 1.00",
+            "weight >= -5.00 AND weight <= 5.00",
             name="ck_preference_parameters_weight",
         ),
         CheckConstraint(
@@ -539,7 +539,7 @@ class PreferenceEvidence(Base):
             name="ck_preference_evidence_reason_hash",
         ),
         CheckConstraint(
-            "requested_weight IS NULL OR (requested_weight >= -1.00 AND requested_weight <= 1.00)",
+            "requested_weight IS NULL OR (requested_weight >= -5.00 AND requested_weight <= 5.00)",
             name="ck_preference_evidence_requested_weight",
         ),
         Index("ix_preference_evidence_parameter_created", "parameter_id", "created_at"),

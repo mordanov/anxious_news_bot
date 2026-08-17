@@ -34,7 +34,10 @@ from anxious_news_bot.preferences.schemas import (
 from anxious_news_bot.preferences.services.apply_changes import (
     DeterministicPreferenceChangeValidator,
 )
-from anxious_news_bot.preferences.services.dimensions import available_dimensions
+from anxious_news_bot.preferences.services.dimensions import (
+    available_dimensions,
+    canonical_dimension_key,
+)
 from anxious_news_bot.preferences.services.duplicates import (
     PreferenceDuplicateDetector,
     rewrite_equivalent_create,
@@ -207,7 +210,8 @@ class PreferenceTuningService:
                     )
                 }
                 if any(
-                    question.dimension_key not in allowed_dimensions
+                    canonical_dimension_key(question.dimension_key)
+                    not in allowed_dimensions
                     for question in candidate.questions
                 ):
                     raise QuestionnaireInvalid(

@@ -50,7 +50,7 @@ WeightText = Annotated[
     str,
     StringConstraints(
         strict=True,
-        pattern=r"^(?:-?(?:0\.(?:0[1-9]|[1-9][0-9]))|0\.00|-?1\.00)$",
+        pattern=r"^-?(?:[0-4]\.[0-9]{2}|5\.00)$",
     ),
 ]
 

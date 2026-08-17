@@ -105,10 +105,10 @@ class StructuredPreferenceModelAdapter:
                 "news-preference questions with exactly four distinct options. "
                 f"Write every question and option only in {language_names[language.value]}. "
                 "Use exactly 10 distinct keys from available_dimensions; copy each "
-                "key exactly into dimension_key. Do not revisit an explored semantic "
-                "dimension under a new name. "
-                "Prefer unexplored dimensions, strong interests, and ambiguity "
-                "clarification. Avoid substantial repetition and disguised yes/no."
+                "key exactly into dimension_key. Do not use any key outside "
+                "available_dimensions, even if it appears in explored_dimensions. "
+                "Prefer dimensions absent from explored_dimensions, strong interests, "
+                "and ambiguity clarification. Avoid substantial repetition and disguised yes/no."
             ),
         }
         try:
@@ -147,8 +147,9 @@ class StructuredPreferenceModelAdapter:
                 "For adjust changes the new target_weight must differ from the "
                 "current weight; for refine changes at least one field must differ "
                 "from the current value. "
-                "Weights must be exactly four characters: '0.25', '0.50', '0.75', "
-                "'1.00', etc. — never '0.5' or '0.500'."
+                "Weights must use exactly two decimal places in the range -5.00 to "
+                "5.00 in 0.10 steps: '0.10', '0.50', '2.30', '-1.50', etc. — "
+                "never '0.5' or '0.500'."
             ),
         }
         try:

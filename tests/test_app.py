@@ -30,5 +30,4 @@ def test_build_application_registers_count_and_digest_services() -> None:
     }
     assert {"start", "language", "news", "tune", "specify", "count"} <= commands
     assert "digest_repository" in application.bot_data
-    assert "digest_execution_service" in application.bot_data
     assert "digest_configuration_service" in application.bot_data

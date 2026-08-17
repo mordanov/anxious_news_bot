@@ -91,7 +91,7 @@ def test_accepts_canonical_explicit_weights(weight: str) -> None:
 
 @pytest.mark.parametrize(
     "weight",
-    ["-0.00", "0", "0.1", "0.001", "1e-1", "1.01", "-1.01"],
+    ["-0.00", "0", "0.1", "0.001", "1e-1", "5.01", "-5.01"],
 )
 def test_rejects_negative_zero_precision_and_range_violations(weight: str) -> None:
     with pytest.raises(ValidationError):

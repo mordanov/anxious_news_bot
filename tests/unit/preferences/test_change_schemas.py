@@ -35,7 +35,7 @@ def test_accepts_canonical_decimal_boundaries(weight: str) -> None:
 
 
 @pytest.mark.parametrize(
-    "weight", ["-0.00", "0", "1", "1.01", "-1.01", "0.1", "0.001", "1e-1"]
+    "weight", ["-0.00", "0", "1", "5.01", "-5.01", "0.1", "0.001", "1e-1"]
 )
 def test_rejects_noncanonical_or_out_of_range_weights(weight: str) -> None:
     with pytest.raises(ValidationError):

@@ -53,7 +53,7 @@ def test_migration_backfills_disabled_safe_defaults(
         revision = connection.execute(
             "SELECT version_num FROM alembic_version"
         ).fetchone()
-        assert revision == ("005_scheduler_digest",)
+        assert revision == ("006_preference_weight_range",)
 
 
 async def test_digest_schema_has_expected_enums_indexes_and_constraints(

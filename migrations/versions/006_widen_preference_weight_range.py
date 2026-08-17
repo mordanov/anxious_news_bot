@@ -1,6 +1,6 @@
 """Widen preference weight range from ±1 to ±5.
 
-Revision ID: 006_widen_preference_weight_range
+Revision ID: 006_preference_weight_range
 Revises: 005_scheduler_digest
 Create Date: 2026-08-17
 """
@@ -11,7 +11,7 @@ from collections.abc import Sequence
 
 from alembic import op
 
-revision: str = "006_widen_preference_weight_range"
+revision: str = "006_preference_weight_range"
 down_revision: str | None = "005_scheduler_digest"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None

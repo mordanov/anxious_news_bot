@@ -26,7 +26,6 @@ from anxious_news_bot.infrastructure.users import (
 )
 from anxious_news_bot.logging import configure_logging
 from anxious_news_bot.news.infrastructure.database import Database
-from anxious_news_bot.preferences.domain import SupportedLanguage
 from anxious_news_bot.preferences.infrastructure.llm import (
     StructuredPreferenceModelAdapter,
 )
@@ -56,7 +55,6 @@ from anxious_news_bot.preferences.services.retention import (
     PreferenceRetentionService,
 )
 from anxious_news_bot.preferences.services.specify import ExplicitPreferenceService
-from anxious_news_bot.preferences.services.timezone import UserTimezoneService
 from anxious_news_bot.preferences.services.tokens import SecureCallbackTokenFactory
 from anxious_news_bot.preferences.services.tune import PreferenceTuningService
 from anxious_news_bot.ranking.infrastructure.llm import (
@@ -95,30 +93,14 @@ from anxious_news_bot.telegram.my import MyTelegramAdapter
 from anxious_news_bot.telegram.news import NewsTelegramAdapter
 from anxious_news_bot.telegram.news_translation import StructuredNewsTitleTranslator
 from anxious_news_bot.telegram.specify import SpecifyTelegramAdapter
-from anxious_news_bot.telegram.timezone import TimezoneTelegramAdapter
 from anxious_news_bot.telegram.tune import CALLBACK_PREFIX, TuneTelegramAdapter
 
 LOGGER = logging.getLogger(__name__)
-
-_START_MESSAGES = {
-    SupportedLanguage.RUSSIAN: (
-        "Бот запущен. Используйте /tune для настройки предпочтений "
-        "или /language для смены языка."
-    ),
-    SupportedLanguage.ENGLISH: (
-        "The bot is running. Tune your preferences with /tune command, "
-        "set language with /language command."
-    ),
-    SupportedLanguage.SPANISH: (
-        "El bot está en marcha. Personaliza tus preferencias con /tune "
-        "o cambia el idioma con /language."
-    ),
-}
+START_MESSAGE = "The bot is running. Tune your preferences with /tune command, set language with /language command."
 
 _BOT_COMMANDS = [
     BotCommand("start", "Get started with the bot"),
     BotCommand("language", "Set your language"),
-    BotCommand("timezone", "Set your timezone (e.g. /timezone +3)"),
     BotCommand("news", "Get personalized news"),
     BotCommand("tune", "Customize your preferences"),
     BotCommand("specify", "Add an explicit preference"),
@@ -143,6 +125,14 @@ def _stop_scheduler(scheduler: object | None) -> None:
     except JobLookupError:
         # Application.stop() may already have removed JobQueue jobs.
         LOGGER.debug("scheduler_job_already_removed")
+
+
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    del context
+    if update.message is None:
+        LOGGER.warning("start_command_without_message")
+        return
+    await update.message.reply_text(START_MESSAGE)
 
 
 async def handle_error(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -210,7 +200,6 @@ def build_application(settings: Settings) -> Application:
         interpretation_attempts=settings.preferences_interpretation_attempts,
     )
     language_service = UserLanguageService(preference_repository, preference_clock)
-    timezone_service = UserTimezoneService(preference_repository)
     specify_service = ExplicitPreferenceService(
         preference_repository,
         preference_model,
@@ -222,7 +211,6 @@ def build_application(settings: Settings) -> Application:
     )
     tune_adapter = TuneTelegramAdapter(tuning_service, language_service)
     language_adapter = LanguageTelegramAdapter(language_service)
-    timezone_adapter = TimezoneTelegramAdapter(timezone_service, language_service)
     help_adapter = HelpTelegramAdapter(language_service)
     specify_adapter = SpecifyTelegramAdapter(
         specify_service,
@@ -309,18 +297,7 @@ def build_application(settings: Settings) -> Application:
         language_service,
         news_title_translator,
         digest_config_service,
-        timezone_service,
     )
-
-    async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-        del context
-        user = update.effective_user
-        message = update.message
-        if user is None or message is None:
-            LOGGER.warning("start_command_without_message")
-            return
-        language = await language_service.get(user.id, user.language_code)
-        await message.reply_text(_START_MESSAGES[language])
 
     async def post_init(application: Application) -> None:
         LOGGER.info(
@@ -420,7 +397,6 @@ def build_application(settings: Settings) -> Application:
     )
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("language", language_adapter.command))
-    application.add_handler(CommandHandler("timezone", timezone_adapter.command))
     application.add_handler(CommandHandler("help", help_adapter.command))
     application.add_handler(CommandHandler("news", news_adapter.command))
     application.add_handler(CommandHandler("tune", tune_adapter.command))

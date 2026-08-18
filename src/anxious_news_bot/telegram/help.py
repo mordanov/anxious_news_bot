@@ -15,7 +15,6 @@ HELP_MESSAGES = {
 
 /start - Начать работу с ботом
 /language - Выбрать язык интерфейса
-/timezone - Установить часовой пояс (например, /timezone +3)
 /news - Получить персонализированные новости
 /tune - Настроить ваши предпочтения
 /specify - Добавить явное предпочтение
@@ -28,7 +27,6 @@ HELP_MESSAGES = {
 
 /start - Get started with the bot
 /language - Choose your language
-/timezone - Set your timezone (e.g. /timezone +3)
 /news - Get personalized news
 /tune - Customize your preferences
 /specify - Add an explicit preference
@@ -41,7 +39,6 @@ Start with /tune to customize your preferences or use /language to change the la
 
 /start - Comenzar con el bot
 /language - Elegir tu idioma
-/timezone - Establecer tu zona horaria (ej. /timezone +3)
 /news - Obtener noticias personalizadas
 /tune - Personalizar tus preferencias
 /specify - Añadir una preferencia explícita

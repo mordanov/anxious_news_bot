@@ -53,7 +53,7 @@ def test_migration_backfills_disabled_safe_defaults(
         revision = connection.execute(
             "SELECT version_num FROM alembic_version"
         ).fetchone()
-        assert revision == ("008_add_user_timezone",)
+        assert revision == ("007_ranking_contribution_weight",)
 
 
 async def test_digest_schema_has_expected_enums_indexes_and_constraints(

@@ -159,6 +159,24 @@ class SQLAlchemyPreferenceRepository:
                 )
             )
 
+    async def get_utc_offset(self, telegram_user_id: int) -> int:
+        async with self._database.session() as session:
+            user, _ = await self._ensure_user_profile(
+                session,
+                telegram_user_id=telegram_user_id,
+                language_code=None,
+            )
+            return user.utc_offset_hours
+
+    async def set_utc_offset(self, telegram_user_id: int, offset_hours: int) -> None:
+        async with self._database.session() as session:
+            user, _ = await self._ensure_user_profile(
+                session,
+                telegram_user_id=telegram_user_id,
+                language_code=None,
+            )
+            user.utc_offset_hours = offset_hours
+
     async def start_or_resume(
         self, telegram_user_id: int, language_code: str | None
     ) -> tuple[QuestionnaireContext, TuneState]:

@@ -57,6 +57,9 @@ class ApplicationUser(TimestampMixin, Base):
         BigInteger, nullable=False, unique=True
     )
     language_code: Mapped[str | None] = mapped_column(String(35))
+    utc_offset_hours: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default=sql_text("0")
+    )
 
     profile: Mapped[PreferenceProfile | None] = relationship(back_populates="user")
     questionnaires: Mapped[list[Questionnaire]] = relationship(back_populates="user")

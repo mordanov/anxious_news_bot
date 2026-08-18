@@ -21,7 +21,7 @@ async def test_news_command_renders_ranked_articles() -> None:
             summary="Summary",
             canonical_url="https://example.com/story",
             source_name="Example News",
-            published_at=datetime(2026, 8, 13, tzinfo=UTC),
+            published_at=datetime(2026, 8, 13, 10, 30, tzinfo=UTC),
         ),
         position=1,
         score=Decimal("0.90000000"),
@@ -34,6 +34,7 @@ async def test_news_command_renders_ranked_articles() -> None:
     configuration_service = Mock(
         get_current=AsyncMock(return_value=Mock(digest_count=7))
     )
+    timezone_service = Mock(get=AsyncMock(return_value=0))
     status_message = Mock(edit_text=AsyncMock())
     reply = AsyncMock(return_value=status_message)
     update = Mock(
@@ -47,6 +48,7 @@ async def test_news_command_renders_ranked_articles() -> None:
         language_service,
         translator,
         configuration_service,
+        timezone_service,
     ).command(update, Mock())
 
     service.top.assert_awaited_once_with(
@@ -86,6 +88,7 @@ async def test_news_command_reports_translation_failure() -> None:
     configuration_service = Mock(
         get_current=AsyncMock(return_value=Mock(digest_count=10))
     )
+    timezone_service = Mock(get=AsyncMock(return_value=0))
     status_message = Mock(edit_text=AsyncMock())
     update = Mock(
         update_id=100,
@@ -98,6 +101,7 @@ async def test_news_command_reports_translation_failure() -> None:
         language_service,
         translator,
         configuration_service,
+        timezone_service,
     ).command(update, Mock())
 
     status_message.edit_text.assert_awaited_once_with(
@@ -114,6 +118,7 @@ async def test_news_command_reports_configuration_failure() -> None:
             side_effect=OperationalError("lookup", {}, RuntimeError("database"))
         )
     )
+    timezone_service = Mock(get=AsyncMock(return_value=0))
     status_message = Mock(edit_text=AsyncMock())
     update = Mock(
         update_id=101,
@@ -128,6 +133,7 @@ async def test_news_command_reports_configuration_failure() -> None:
         language_service,
         translator,
         configuration_service,
+        timezone_service,
     ).command(update, Mock())
 
     service.top.assert_not_awaited()
